@@ -26,13 +26,39 @@ if (!ALLOWED_DEPARTMENTS.has(department)) {
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   admin.initializeApp();
 } else {
-  const keyPath = path.resolve(__dirname, "../secrets/serviceAccountKey.json");
-  if (!fs.existsSync(keyPath)) {
-    console.error(`No service account found at ${keyPath} and GOOGLE_APPLICATION_CREDENTIALS is not set.`);
+  // Try common locations: ./secrets/serviceAccountKey.json (from cwd), or relative to this script using __dirname if available
+  const cwdKey = path.resolve(process.cwd(), 'secrets/serviceAccountKey.json');
+  let keyPath = '';
+  if (fs.existsSync(cwdKey)) {
+    keyPath = cwdKey;
+  } else {
+    try {
+      // __dirname may be available when running ts-node; if so, check relative path
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const alt = path.resolve(__dirname, '../secrets/serviceAccountKey.json');
+      if (fs.existsSync(alt)) {
+        keyPath = alt;
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  if (!keyPath) {
+    console.error(`No service account found at ${cwdKey} and GOOGLE_APPLICATION_CREDENTIALS is not set.`);
     console.error("Create a service account key in Firebase Console and set GOOGLE_APPLICATION_CREDENTIALS or place the file at functions/secrets/serviceAccountKey.json (never commit it)");
     process.exit(1);
   }
-  const serviceAccount = require(keyPath);
+
+  const raw = fs.readFileSync(keyPath, 'utf8');
+  let serviceAccount: any;
+  try {
+    serviceAccount = JSON.parse(raw);
+  } catch (e: any) {
+    console.error(`Service account JSON at ${keyPath} is invalid:`, e.message || e);
+    process.exit(1);
+  }
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
   });
@@ -40,7 +66,22 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
 
 async function run() {
   try {
+    const userRecord = await admin.auth().getUser(uid).catch(() => null);
+    console.log('Target UID:', uid, 'User exists:', !!userRecord);
+    console.log('Project ID (admin.app().options.projectId):', admin.app().options.projectId);
+
     await admin.auth().setCustomUserClaims(uid, { role: "admin", department });
+    console.log('Custom claims set. Testing Firestore access...');
+
+    // Test Firestore access by listing collections (non-destructive).
+    try {
+      const cols = await admin.firestore().listCollections();
+      console.log('Firestore accessible. Existing top-level collections:', cols.map(c => c.id));
+    } catch (e: any) {
+      console.error('Firestore access test failed. This usually means Firestore is not enabled for the project or the service account lacks permissions.');
+      console.error('Error from Firestore:', e.message || e);
+      throw e;
+    }
 
     await admin
       .firestore()
@@ -52,6 +93,11 @@ async function run() {
     process.exit(0);
   } catch (err: any) {
     console.error("❌ Error setting initial admin:", err);
+    // Additional guidance for common errors
+    if (err && err.code === 5) {
+      console.error('gRPC Code 5 (NOT_FOUND) typically indicates Firestore is not enabled in the Firebase project, or the service account/project ID is mismatched.');
+      console.error('Check the service account JSON project_id matches your Firebase project, and ensure Firestore is enabled in the Firebase Console.');
+    }
     process.exit(1);
   }
 }

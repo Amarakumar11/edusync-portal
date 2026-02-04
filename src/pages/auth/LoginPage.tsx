@@ -166,13 +166,13 @@ export function LoginPage() {
                   </p>
                 )}
 
-                {isAdmin && (
-                  <div className="text-center text-xs text-muted-foreground border-t pt-4">
+                /* {isAdmin && (
+                    <div className="text-center text-xs text-muted-foreground border-t pt-4">
                     <p className="mb-1">Demo Credentials:</p>
                     <p>ERP ID: <code className="bg-muted px-1 rounded">ADMIN001</code></p>
                     <p>Password: <code className="bg-muted px-1 rounded">admin123</code></p>
-                  </div>
-                )}
+                  </div> 
+                )} */
               </form>
             </CardContent>
           </Card>
