@@ -1,26 +1,38 @@
-import * as admin from 'firebase-admin';
+import * as admin from "firebase-admin";
+import * as path from "path";
 
 // Usage:
-// export GOOGLE_APPLICATION_CREDENTIALS="/path/to/serviceAccountKey.json"
-// ts-node functions/scripts/setInitialAdmin.ts <UID> <DEPARTMENT>
+// npx ts-node scripts/setInitialAdmin.ts <UID> <DEPARTMENT>
 
 const uid = process.argv[2];
-const department = process.argv[3] || 'CSE';
+const department = process.argv[3] || "CSE";
+
 if (!uid) {
-  console.error('Usage: ts-node functions/scripts/setInitialAdmin.ts <UID> <DEPARTMENT>');
+  console.error("Usage: npx ts-node scripts/setInitialAdmin.ts <UID> <DEPARTMENT>");
   process.exit(1);
 }
 
-admin.initializeApp();
+// Initialize Admin SDK using the JSON key file
+admin.initializeApp({
+  credential: admin.credential.cert(
+    require(path.resolve("../../secrets/serviceAccountKey.json"))
+  ),
+});
 
 async function run() {
   try {
-    await admin.auth().setCustomUserClaims(uid, { role: 'admin', department });
-    await admin.firestore().collection('users').doc(uid).set({ role: 'admin', department }, { merge: true });
-    console.log(`Successfully set user ${uid} as admin in department ${department}`);
+    await admin.auth().setCustomUserClaims(uid, { role: "admin", department });
+
+    await admin
+      .firestore()
+      .collection("users")
+      .doc(uid)
+      .set({ role: "admin", department }, { merge: true });
+
+    console.log(`✅ Successfully set user ${uid} as admin in department ${department}`);
     process.exit(0);
   } catch (err: any) {
-    console.error('Error setting initial admin:', err);
+    console.error("❌ Error setting initial admin:", err);
     process.exit(1);
   }
 }
