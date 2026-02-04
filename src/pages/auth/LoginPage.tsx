@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/components/landing/Logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,19 +14,22 @@ import {
 } from '@/components/ui/card';
 import { AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { UserRole } from '@/types';
+import { loginWithEmailPassword } from '@/demoAuth';
+
+// ⚠️ DEMO MODE: Using hardcoded demo credentials
+// For production, replace with real Firebase Auth
 
 export function LoginPage() {
-  const { role } = useParams<{ role: UserRole }>();
+  const { role } = useParams<{ role?: string }>();
   const navigate = useNavigate();
-  const { login, isLoading } = useAuth();
 
   const [formData, setFormData] = useState({
-    erpId: '',
+    email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const isAdmin = role === 'admin';
 
@@ -35,20 +37,36 @@ export function LoginPage() {
     e.preventDefault();
     setError('');
 
-    if (!formData.erpId || !formData.password) {
+    if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
       return;
     }
 
-    const result = await login(
-      { erpId: formData.erpId, password: formData.password },
-      role as UserRole
-    );
+    setIsLoading(true);
+    try {
+      const user = await loginWithEmailPassword(formData.email, formData.password);
+      
+      // Verify role matches the page they're on
+      if (isAdmin && user.role !== 'admin') {
+        setError('This account is not an admin account');
+        setIsLoading(false);
+        return;
+      }
+      if (!isAdmin && user.role !== 'faculty') {
+        setError('This account is not a faculty account');
+        setIsLoading(false);
+        return;
+      }
 
-    if (result.success) {
-      navigate('/verify-otp');
-    } else {
-      setError(result.error || 'Login failed');
+      // Redirect based on role
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/faculty');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+      setIsLoading(false);
     }
   };
 
@@ -106,12 +124,13 @@ export function LoginPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="erpId">ERP ID</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="erpId"
-                    placeholder="Enter your ERP ID"
-                    value={formData.erpId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, erpId: e.target.value }))}
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     className="input-focus"
                     disabled={isLoading}
                   />
@@ -165,14 +184,6 @@ export function LoginPage() {
                     </Link>
                   </p>
                 )}
-
-                /* {isAdmin && (
-                    <div className="text-center text-xs text-muted-foreground border-t pt-4">
-                    <p className="mb-1">Demo Credentials:</p>
-                    <p>ERP ID: <code className="bg-muted px-1 rounded">ADMIN001</code></p>
-                    <p>Password: <code className="bg-muted px-1 rounded">admin123</code></p>
-                  </div> 
-                )} */
               </form>
             </CardContent>
           </Card>
