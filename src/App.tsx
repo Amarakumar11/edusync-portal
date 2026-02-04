@@ -18,16 +18,18 @@ import NotFound from "./pages/NotFound";
 import FacultyHome from "./pages/faculty/FacultyHome";
 import TimetablePage from "./pages/faculty/TimetablePage";
 import LeaveHome from "./pages/faculty/LeaveHome";
-import ApplyLeavePage from "./pages/faculty/ApplyLeavePage";
+import { ApplyLeavePage } from "./pages/faculty/ApplyLeavePage";
 import LeaveHistoryPage from "./pages/faculty/LeaveHistoryPage";
 import AnnouncementsPage from "./pages/faculty/AnnouncementsPage";
 import EventsPage from "./pages/faculty/EventsPage";
-import NotificationsPage from "./pages/faculty/NotificationsPage";
+import { NotificationsPage } from "./pages/faculty/NotificationsPage";
 import ExamsPage from "./pages/faculty/ExamsPage";
 import ProfilePage from "./pages/faculty/ProfilePage";
 
 // Admin Pages
 import AdminHome from "./pages/admin/AdminHome";
+import { LeaveRequestsPage } from "./pages/admin/LeaveRequestsPage";
+import { AdminNotificationsPage } from "./pages/admin/NotificationsPage";
 
 const queryClient = new QueryClient();
 
@@ -54,7 +56,7 @@ const App = () => (
               <Route index element={<FacultyHome />} />
               <Route path="timetable" element={<TimetablePage />} />
               <Route path="leave" element={<LeaveHome />} />
-              <Route path="leave/apply" element={<ApplyLeavePage />} />
+              <Route path="apply-leave" element={<ApplyLeavePage />} />
               <Route path="leave-history" element={<LeaveHistoryPage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="events" element={<EventsPage />} />
@@ -71,9 +73,10 @@ const App = () => (
             }>
               <Route index element={<AdminHome />} />
               <Route path="timetable" element={<TimetablePage />} />
+              <Route path="leave-requests" element={<LeaveRequestsPage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="events" element={<EventsPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="notifications" element={<AdminNotificationsPage />} />
               <Route path="exams" element={<ExamsPage />} />
             </Route>
 

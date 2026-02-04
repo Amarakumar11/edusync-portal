@@ -1,181 +1,186 @@
+// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '@/components/dashboard/PageHeader';
-import { DataCard } from '@/components/dashboard/DataCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { CalendarIcon, Send, CheckCircle2, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import type { LeaveType } from '@/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '@/components/dashboard/PageHeader';
+import { getCurrentUser } from '@/demoAuth';
+import { createLeaveRequest } from '@/services/leaveService';
+import { createNotification } from '@/services/notificationService';
 
 export function ApplyLeavePage() {
   const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-  
+  const { toast } = useToast();
+  const user = getCurrentUser();
+
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    leaveType: '' as LeaveType | '',
-    startDate: undefined as Date | undefined,
-    endDate: undefined as Date | undefined,
+    fromDate: '',
+    toDate: '',
     reason: '',
   });
 
+  if (!user || user.role !== 'faculty') {
+    return null;
+  }
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
-    if (!formData.leaveType || !formData.startDate || !formData.reason) {
-      setError('Please fill in all required fields');
+    // Validation
+    if (!formData.fromDate || !formData.toDate || !formData.reason.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all fields',
+        variant: 'destructive',
+      });
       return;
     }
 
-    setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false);
-    setSuccess(true);
+    if (new Date(formData.fromDate) > new Date(formData.toDate)) {
+      toast({
+        title: 'Error',
+        description: 'From date must be before to date',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    // Redirect after success
-    setTimeout(() => {
-      navigate('/faculty/leave-history');
-    }, 2000);
+    setLoading(true);
+
+    try {
+      // Create leave request
+      createLeaveRequest(
+        user.email,
+        user.name,
+        user.erpId || 'N/A',
+        user.department,
+        formData.reason,
+        formData.fromDate,
+        formData.toDate
+      );
+
+      // Create notification for HOD
+      createNotification(
+        'admin',
+        user.department,
+        `New leave request from ${user.name} (${user.erpId || 'N/A'}) from ${formData.fromDate} to ${formData.toDate}`
+      );
+
+      toast({
+        title: 'Success',
+        description: 'Leave request sent to HOD',
+      });
+
+      // Reset form
+      setFormData({
+        fromDate: '',
+        toDate: '',
+        reason: '',
+      });
+
+      // Redirect to leave history
+      setTimeout(() => {
+        navigate('/faculty/leave-history');
+      }, 1500);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to submit leave request',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (success) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center animate-scale-in">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-success/10 mb-6">
-            <CheckCircle2 className="h-10 w-10 text-success" />
-          </div>
-          <h2 className="font-display text-2xl font-bold text-foreground mb-2">
-            Leave Request Submitted!
-          </h2>
-          <p className="text-muted-foreground">
-            Your request has been sent to the admin for approval.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader 
+    <div className="space-y-6">
+      <PageHeader
         title="Apply for Leave"
-        description="Submit a new leave request"
+        description="Submit your leave request to your HOD"
       />
 
-      <div className="max-w-2xl">
-        <DataCard title="Leave Application Form">
+      <Card>
+        <CardHeader>
+          <CardTitle>Leave Request Form</CardTitle>
+          <CardDescription>
+            Department: <span className="font-semibold">{user.department}</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {/* Leave Type */}
-            <div className="space-y-2">
-              <Label htmlFor="leaveType">Leave Type *</Label>
-              <Select 
-                value={formData.leaveType} 
-                onValueChange={(value: LeaveType) => setFormData(prev => ({ ...prev, leaveType: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select leave type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="casual">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-destructive"></span>
-                      Casual Leave
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="paid">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-warning"></span>
-                      Paid Leave
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="sick">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-info"></span>
-                      Sick Leave
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fromDate">From Date *</Label>
+                <Input
+                  id="fromDate"
+                  name="fromDate"
+                  type="date"
+                  value={formData.fromDate}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="toDate">To Date *</Label>
+                <Input
+                  id="toDate"
+                  name="toDate"
+                  type="date"
+                  value={formData.toDate}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
             </div>
 
-            {/* Date Selection */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !formData.startDate && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.startDate ? format(formData.startDate, 'PPP') : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.startDate}
-                      onSelect={(date) => setFormData(prev => ({ ...prev, startDate: date }))}
-                      initialFocus
-                      disabled={(date) => date < new Date()}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason for Leave *</Label>
+              <Textarea
+                id="reason"
+                name="reason"
+                placeholder="Provide details about your leave request..."
+                value={formData.reason}
+                onChange={handleChange}
+                rows={5}
+                required
+              />
+            </div>
 
-              <div className="space-y-2">
-                <Label>End Date (Optional)</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !formData.endDate && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.endDate ? format(formData.endDate, 'PPP') : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
+            <div className="flex gap-4">
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Submitting...' : 'Submit Request'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/faculty')}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
                       mode="single"
                       selected={formData.endDate}
                       onSelect={(date) => setFormData(prev => ({ ...prev, endDate: date }))}
@@ -224,14 +229,4 @@ export function ApplyLeavePage() {
                     <Send className="mr-2 h-4 w-4" />
                     Submit Request
                   </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </DataCard>
-      </div>
-    </div>
-  );
-}
 
-export default ApplyLeavePage;

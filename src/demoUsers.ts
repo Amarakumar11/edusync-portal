@@ -7,26 +7,26 @@
 // ADMIN USERS:
 // | Email                    | Password     | Department  |
 // |--------------------------|--------------|-------------|
-// | hod.cse@edusync.com      | Admin@123    | CSE         |
-// | hod.cse_aiml@edusync.com | Admin@123    | CSE_AIML    |
-// | hod.cse_aids@edusync.com | Admin@123    | CSE_AIDS    |
-// | hod.cse_ds@edusync.com   | Admin@123    | CSE_DS      |
-// | hod.ece@edusync.com      | Admin@123    | ECE         |
-// | hod.hs@edusync.com       | Admin@123    | HS          |
+// | hod.cse@edusync.com      | Admin@cse    | CSE         |
+// | hod.cse_aiml@edusync.com | Admin@csm    | CSE_AIML    |
+// | hod.cse_aids@edusync.com | Admin@aids   | CSE_AIDS    |
+// | hod.cse_ds@edusync.com   | Admin@ds     | CSE_DS      |
+// | hod.ece@edusync.com      | Admin@ece    | ECE         |
+// | hod.hs@edusync.com       | Admin@hs     | HS          |
 //
 // FACULTY USERS:
 // | Email                    | Password       | Department  | ERP ID  |
 // |--------------------------|----------------|-------------|---------|
-// | faculty1@edusync.com     | Faculty@123    | CSE         | ERP001  |
-// | faculty2@edusync.com     | Faculty@123    | CSE_AIML    | ERP002  |
-// | faculty3@edusync.com     | Faculty@123    | CSE_AIDS    | ERP003  |
-// | faculty4@edusync.com     | Faculty@123    | CSE_DS      | ERP004  |
-// | faculty5@edusync.com     | Faculty@123    | ECE         | ERP005  |
-// | faculty6@edusync.com     | Faculty@123    | HS          | ERP006  |
-// | faculty7@edusync.com     | Faculty@123    | CSE         | ERP007  |
-// | faculty8@edusync.com     | Faculty@123    | CSE_AIML    | ERP008  |
-// | faculty9@edusync.com     | Faculty@123    | CSE_AIDS    | ERP009  |
-// | faculty10@edusync.com    | Faculty@123    | CSE_DS      | ERP010  |
+// | faculty1@edusync.com     | Faculty@cse    | CSE         | ERP001  |
+// | faculty2@edusync.com     | Faculty@csm    | CSE_AIML    | ERP002  |
+// | faculty3@edusync.com     | Faculty@aids   | CSE_AIDS    | ERP003  |
+// | faculty4@edusync.com     | Faculty@ds     | CSE_DS      | ERP004  |
+// | faculty5@edusync.com     | Faculty@ece    | ECE         | ERP005  |
+// | faculty6@edusync.com     | Faculty@hs     | HS          | ERP006  |
+// | faculty7@edusync.com     | Faculty@cse    | CSE         | ERP007  |
+// | faculty8@edusync.com     | Faculty@csm    | CSE_AIML    | ERP008  |
+// | faculty9@edusync.com     | Faculty@aids   | CSE_AIDS    | ERP009  |
+// | faculty10@edusync.com    | Faculty@ds     | CSE_DS      | ERP010  |
 // ============================================================
 
 export type Department = 'CSE' | 'CSE_AIML' | 'CSE_AIDS' | 'CSE_DS' | 'ECE' | 'HS';
@@ -45,42 +45,42 @@ export interface DemoUser {
 export const DEMO_ADMINS: DemoUser[] = [
   {
     email: 'hod.cse@edusync.com',
-    password: 'Admin@123',
+    password: 'Admin@cse',
     role: 'admin',
     department: 'CSE',
     name: 'HOD CSE',
   },
   {
     email: 'hod.cse_aiml@edusync.com',
-    password: 'Admin@123',
+    password: 'Admin@csm',
     role: 'admin',
     department: 'CSE_AIML',
     name: 'HOD CSE (AIML)',
   },
   {
     email: 'hod.cse_aids@edusync.com',
-    password: 'Admin@123',
+    password: 'Admin@aids',
     role: 'admin',
     department: 'CSE_AIDS',
     name: 'HOD CSE (AIDS)',
   },
   {
     email: 'hod.cse_ds@edusync.com',
-    password: 'Admin@123',
+    password: 'Admin@ds',
     role: 'admin',
     department: 'CSE_DS',
     name: 'HOD CSE (DS)',
   },
   {
     email: 'hod.ece@edusync.com',
-    password: 'Admin@123',
+    password: 'Admin@ece',
     role: 'admin',
     department: 'ECE',
     name: 'HOD ECE',
   },
   {
     email: 'hod.hs@edusync.com',
-    password: 'Admin@123',
+    password: 'Admin@hs',
     role: 'admin',
     department: 'HS',
     name: 'HOD HS',
@@ -90,7 +90,7 @@ export const DEMO_ADMINS: DemoUser[] = [
 export const DEMO_FACULTIES: DemoUser[] = [
   {
     email: 'faculty1@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@cse',
     role: 'faculty',
     department: 'CSE',
     name: 'Faculty One',
@@ -98,7 +98,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty2@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@csm',
     role: 'faculty',
     department: 'CSE_AIML',
     name: 'Faculty Two',
@@ -106,7 +106,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty3@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@aids',
     role: 'faculty',
     department: 'CSE_AIDS',
     name: 'Faculty Three',
@@ -114,7 +114,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty4@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@ds',
     role: 'faculty',
     department: 'CSE_DS',
     name: 'Faculty Four',
@@ -122,7 +122,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty5@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@ece',
     role: 'faculty',
     department: 'ECE',
     name: 'Faculty Five',
@@ -130,7 +130,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty6@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@hs',
     role: 'faculty',
     department: 'HS',
     name: 'Faculty Six',
@@ -138,7 +138,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty7@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@cse',
     role: 'faculty',
     department: 'CSE',
     name: 'Faculty Seven',
@@ -146,7 +146,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty8@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@csm',
     role: 'faculty',
     department: 'CSE_AIML',
     name: 'Faculty Eight',
@@ -154,7 +154,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty9@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@aids',
     role: 'faculty',
     department: 'CSE_AIDS',
     name: 'Faculty Nine',
@@ -162,7 +162,7 @@ export const DEMO_FACULTIES: DemoUser[] = [
   },
   {
     email: 'faculty10@edusync.com',
-    password: 'Faculty@123',
+    password: 'Faculty@ds',
     role: 'faculty',
     department: 'CSE_DS',
     name: 'Faculty Ten',

@@ -1,194 +1,103 @@
-import { useState } from 'react';
+// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/dashboard/PageHeader';
-import { DataCard } from '@/components/dashboard/DataCard';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Bell, Send, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/dashboard/EmptyState';
+import { useToast } from '@/hooks/use-toast';
+import { getCurrentUser } from '@/demoAuth';
+import { getFacultyNotifications, markNotificationAsRead } from '@/services/notificationService';
+import { Notification } from '@/types/leave';
+import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-interface Notification {
-  id: string;
-  senderName: string;
-  message: string;
-  read: boolean;
-  createdAt: Date;
-}
-
-const mockReceivedNotifications: Notification[] = [
-  {
-    id: '1',
-    senderName: 'Admin',
-    message: 'Your leave request for January 15th has been approved.',
-    read: false,
-    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
-  },
-  {
-    id: '2',
-    senderName: 'Dr. Smith',
-    message: 'Please share the lab manual for Database Systems.',
-    read: false,
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-  },
-  {
-    id: '3',
-    senderName: 'Admin',
-    message: 'Prof. Johnson is on leave today. Please take classes as per timetable.',
-    read: true,
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-  },
-];
-
-const mockSentNotifications: Notification[] = [
-  {
-    id: '1',
-    senderName: 'Dr. Smith',
-    message: 'Lab manual has been shared. Please check your email.',
-    read: true,
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-  },
-];
-
-const recipients = [
-  { id: 'admin', name: 'Admin' },
-  { id: 'faculty-1', name: 'Dr. Smith' },
-  { id: 'faculty-2', name: 'Prof. Johnson' },
-  { id: 'faculty-3', name: 'Dr. Williams' },
-  { id: 'all', name: 'All Faculty' },
-];
-
 export function NotificationsPage() {
-  const [newMessage, setNewMessage] = useState('');
-  const [selectedRecipient, setSelectedRecipient] = useState('');
-  const [received, setReceived] = useState(mockReceivedNotifications);
-  const [sent, setSent] = useState(mockSentNotifications);
+  const user = getCurrentUser();
+  const { toast } = useToast();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const unreadCount = received.filter(n => !n.read).length;
+  useEffect(() => {
+    loadNotifications();
+  }, []);
 
-  const handleMarkAsRead = (id: string) => {
-    setReceived(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const loadNotifications = () => {
+    if (!user || user.role !== 'faculty') {
+      return;
+    }
+
+    const notifs = getFacultyNotifications(user.email);
+    setNotifications(notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    setLoading(false);
   };
 
-  const handleSend = () => {
-    if (!newMessage.trim() || !selectedRecipient) return;
-
-    const recipient = recipients.find(r => r.id === selectedRecipient);
-    const newNotification: Notification = {
-      id: Date.now().toString(),
-      senderName: recipient?.name || 'Unknown',
-      message: newMessage,
-      read: true,
-      createdAt: new Date(),
-    };
-
-    setSent(prev => [newNotification, ...prev]);
-    setNewMessage('');
-    setSelectedRecipient('');
+  const handleMarkAsRead = (notificationId: string) => {
+    markNotificationAsRead(notificationId);
+    loadNotifications();
+    toast({
+      description: 'Marked as read',
+    });
   };
+
+  if (!user || user.role !== 'faculty') {
+    return null;
+  }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader 
+    <div className="space-y-6">
+      <PageHeader
         title="Notifications"
-        description="View and send notifications"
+        description="Your messages and updates"
       />
 
-      <Tabs defaultValue="received" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="received" className="relative">
-            Received
-            {unreadCount > 0 && (
-              <Badge className="ml-2 bg-primary text-primary-foreground h-5 min-w-5 text-xs">
-                {unreadCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="send">Send</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="received">
-          <DataCard title="Received Notifications" contentClassName="p-0">
-            {received.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No notifications yet.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {received.map((notification) => (
-                  <div 
-                    key={notification.id}
-                    className={`p-4 hover:bg-muted/30 transition-colors cursor-pointer ${
-                      !notification.read ? 'bg-primary/5' : ''
-                    }`}
-                    onClick={() => handleMarkAsRead(notification.id)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                        <User className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-foreground">
-                            {notification.senderName}
-                          </span>
-                          {!notification.read && (
-                            <span className="w-2 h-2 rounded-full bg-primary" />
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
-                        </p>
-                      </div>
+      {loading ? (
+        <Card>
+          <CardContent className="pt-6">
+            <EmptyState title="Loading notifications..." />
+          </CardContent>
+        </Card>
+      ) : notifications.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <EmptyState title="No notifications" description="You have no messages yet" icon={<Bell className="h-4 w-4" />} />
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {notifications.map((notif) => (
+            <Card key={notif.id} className={notif.read ? 'opacity-75' : ''}>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-semibold">{notif.toDepartment} Department</span>
+                      {!notif.read && <Badge className="bg-blue-100 text-blue-800">New</Badge>}
                     </div>
+                    <p className="text-foreground">{notif.message}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </DataCard>
-        </TabsContent>
-
-        <TabsContent value="send">
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Send Form */}
-            <DataCard title="Send Notification">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Recipient</label>
-                  <Select value={selectedRecipient} onValueChange={setSelectedRecipient}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select recipient" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {recipients.map(recipient => (
-                        <SelectItem key={recipient.id} value={recipient.id}>
-                          {recipient.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {!notif.read && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleMarkAsRead(notif.id)}
+                    >
+                      Mark as read
+                    </Button>
+                  )}
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Message</label>
-                  <Textarea
-                    placeholder="Type your message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    rows={4}
-                    className="resize-none"
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
                   />
                 </div>
 
