@@ -1,114 +1,137 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+// Firebase Firestore-based notification service
 
+import { db } from '@/firebase';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  Unsubscribe,
+  writeBatch,
+} from 'firebase/firestore';
 import { Notification } from '@/types/leave';
 
-const NOTIFICATION_STORAGE_KEY = 'edusync_notifications';
+const NOTIFICATION_COLLECTION = 'notifications';
 
 /**
- * Generate unique ID
+ * Create a new notification in Firestore
  */
-function generateId(): string {
-  return `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Get all notifications from localStorage
- */
-export function getAllNotifications(): Notification[] {
-  try {
-    const data = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error reading notifications from localStorage:', error);
-    return [];
-  }
-}
-
-/**
- * Create a new notification
- */
-export function createNotification(
+export async function createNotification(
   toRole: 'admin' | 'faculty',
   toDepartment: string,
   message: string,
   toEmail?: string
-): Notification {
-  const notification: Notification = {
-    id: generateId(),
+): Promise<Notification> {
+  const notifData = {
     toRole,
-    toDepartment: toDepartment as any,
-    toEmail,
+    toDepartment: toDepartment,
+    toEmail: toEmail || null,
     message,
     createdAt: new Date().toISOString(),
     read: false,
   };
 
-  const allNotifications = getAllNotifications();
-  allNotifications.push(notification);
+  const docRef = await addDoc(collection(db, NOTIFICATION_COLLECTION), notifData);
 
-  try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
-  } catch (error) {
-    console.error('Error saving notification to localStorage:', error);
-  }
-
-  return notification;
+  return {
+    id: docRef.id,
+    ...notifData,
+  } as unknown as Notification;
 }
 
 /**
- * Get notifications for faculty
+ * Get all notifications from Firestore
  */
-export function getFacultyNotifications(email: string): Notification[] {
-  return getAllNotifications().filter(
-    (notif) => notif.toRole === 'faculty' && notif.toEmail === email
-  );
+export async function getAllNotifications(): Promise<Notification[]> {
+  try {
+    const snap = await getDocs(
+      query(collection(db, NOTIFICATION_COLLECTION), orderBy('createdAt', 'desc'))
+    );
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Get notifications for a faculty member by email
+ */
+export async function getFacultyNotifications(email: string): Promise<Notification[]> {
+  try {
+    const q = query(
+      collection(db, NOTIFICATION_COLLECTION),
+      where('toRole', '==', 'faculty'),
+      where('toEmail', '==', email),
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
+  } catch (error) {
+    console.error('Error fetching faculty notifications:', error);
+    return [];
+  }
 }
 
 /**
  * Get notifications for admin by department
  */
-export function getAdminNotifications(department: string): Notification[] {
-  return getAllNotifications().filter(
-    (notif) => notif.toRole === 'admin' && notif.toDepartment === department
-  );
-}
-
-/**
- * Mark notification as read
- */
-export function markNotificationAsRead(notificationId: string): Notification | null {
-  const allNotifications = getAllNotifications();
-  const notifIndex = allNotifications.findIndex((notif) => notif.id === notificationId);
-
-  if (notifIndex === -1) {
-    return null;
-  }
-
-  allNotifications[notifIndex].read = true;
-
+export async function getAdminNotifications(department: string): Promise<Notification[]> {
   try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+    const q = query(
+      collection(db, NOTIFICATION_COLLECTION),
+      where('toRole', '==', 'admin'),
+      where('toDepartment', '==', department),
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    console.error('Error fetching admin notifications:', error);
+    return [];
   }
-
-  return allNotifications[notifIndex];
 }
 
 /**
- * Mark all notifications as read for a user
+ * Mark a notification as read
  */
-export function markAllNotificationsAsRead(email: string): void {
-  const allNotifications = getAllNotifications();
-  const updated = allNotifications.map((notif) => {
-    if (notif.toEmail === email && notif.toRole === 'faculty' && !notif.read) {
-      return { ...notif, read: true };
-    }
-    return notif;
-  });
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  const docRef = doc(db, NOTIFICATION_COLLECTION, notificationId);
+  await updateDoc(docRef, { read: true });
+}
 
+/**
+ * Mark all notifications as read for a faculty email
+ */
+export async function markAllNotificationsAsRead(email: string): Promise<void> {
   try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(updated));
+    const q = query(
+      collection(db, NOTIFICATION_COLLECTION),
+      where('toRole', '==', 'faculty'),
+      where('toEmail', '==', email),
+      where('read', '==', false)
+    );
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => {
+      batch.update(d.ref, { read: true });
+    });
+    await batch.commit();
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
   }
@@ -117,21 +140,56 @@ export function markAllNotificationsAsRead(email: string): void {
 /**
  * Delete a notification
  */
-export function deleteNotification(notificationId: string): boolean {
-  const allNotifications = getAllNotifications();
-  const filteredNotifications = allNotifications.filter(
-    (notif) => notif.id !== notificationId
-  );
-
-  if (filteredNotifications.length === allNotifications.length) {
-    return false; // Not found
-  }
-
+export async function deleteNotification(notificationId: string): Promise<boolean> {
   try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(filteredNotifications));
+    await deleteDoc(doc(db, NOTIFICATION_COLLECTION, notificationId));
     return true;
   } catch (error) {
     console.error('Error deleting notification:', error);
     return false;
   }
+}
+
+/**
+ * Listen for admin notifications in real-time
+ */
+export function onAdminNotifications(
+  department: string,
+  callback: (notifications: Notification[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, NOTIFICATION_COLLECTION),
+    where('toRole', '==', 'admin'),
+    where('toDepartment', '==', department),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(q, (snap) => {
+    const notifs = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
+    callback(notifs);
+  });
+}
+
+/**
+ * Listen for faculty notifications in real-time
+ */
+export function onFacultyNotifications(
+  email: string,
+  callback: (notifications: Notification[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, NOTIFICATION_COLLECTION),
+    where('toRole', '==', 'faculty'),
+    where('toEmail', '==', email),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(q, (snap) => {
+    const notifs = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
+    callback(notifs);
+  });
 }

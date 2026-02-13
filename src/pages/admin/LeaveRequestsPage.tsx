@@ -1,4 +1,4 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+// Firebase Firestore-based leave requests page for admin
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -16,14 +16,17 @@ import { EmptyState } from '@/components/dashboard/EmptyState';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/dashboard/PageHeader';
-import { getCurrentUser } from '@/demoAuth';
-import { getLeaveRequestsByDepartment, updateLeaveRequestStatus } from '@/services/leaveService';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  getLeaveRequestsByDepartment,
+  updateLeaveRequestStatus,
+} from '@/services/leaveService';
 import { createNotification } from '@/services/notificationService';
 import { LeaveRequest } from '@/types/leave';
 import { FileText } from 'lucide-react';
 
 export function LeaveRequestsPage() {
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,24 +34,34 @@ export function LeaveRequestsPage() {
 
   useEffect(() => {
     loadLeaveRequests();
-  }, []);
+  }, [user]);
 
-  const loadLeaveRequests = () => {
+  const loadLeaveRequests = async () => {
     if (!user || user.role !== 'admin') {
       return;
     }
 
-    const requests = getLeaveRequestsByDepartment(user.department);
-    setLeaveRequests(requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    setLoading(false);
+    try {
+      const requests = await getLeaveRequestsByDepartment(user.department);
+      setLeaveRequests(
+        requests.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      );
+    } catch (error) {
+      console.error('Error loading leave requests:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleApprove = (leaveRequest: LeaveRequest) => {
+  const handleApprove = async (leaveRequest: LeaveRequest) => {
     setProcessingId(leaveRequest.id);
 
     try {
-      updateLeaveRequestStatus(leaveRequest.id, 'approved');
-      createNotification(
+      await updateLeaveRequestStatus(leaveRequest.id, 'approved');
+      await createNotification(
         'faculty',
         leaveRequest.department,
         `Your leave request has been approved by HOD (${user?.department})`,
@@ -60,7 +73,7 @@ export function LeaveRequestsPage() {
         description: `Leave request approved for ${leaveRequest.facultyName}`,
       });
 
-      loadLeaveRequests();
+      await loadLeaveRequests();
     } catch (error) {
       toast({
         title: 'Error',
@@ -72,12 +85,12 @@ export function LeaveRequestsPage() {
     }
   };
 
-  const handleReject = (leaveRequest: LeaveRequest) => {
+  const handleReject = async (leaveRequest: LeaveRequest) => {
     setProcessingId(leaveRequest.id);
 
     try {
-      updateLeaveRequestStatus(leaveRequest.id, 'rejected');
-      createNotification(
+      await updateLeaveRequestStatus(leaveRequest.id, 'rejected');
+      await createNotification(
         'faculty',
         leaveRequest.department,
         `Your leave request has been rejected by HOD (${user?.department})`,
@@ -89,7 +102,7 @@ export function LeaveRequestsPage() {
         description: `Leave request rejected for ${leaveRequest.facultyName}`,
       });
 
-      loadLeaveRequests();
+      await loadLeaveRequests();
     } catch (error) {
       toast({
         title: 'Error',
@@ -126,7 +139,9 @@ export function LeaveRequestsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {pendingRequests.length === 0 ? (
+          {loading ? (
+            <EmptyState title="Loading leave requests..." />
+          ) : pendingRequests.length === 0 ? (
             <EmptyState
               title="No pending requests"
               description="All leave requests have been processed"

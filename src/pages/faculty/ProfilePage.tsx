@@ -14,9 +14,9 @@ export function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  
+
   const [formData, setFormData] = useState({
-    username: user?.username || '',
+    username: user?.name || '',
     email: user?.email || '',
     phone: user?.phone || '',
   });
@@ -33,7 +33,7 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader 
+      <PageHeader
         title="My Profile"
         description="View and manage your account information"
       >
@@ -78,11 +78,11 @@ export function ProfilePage() {
           <div className="flex flex-col items-center">
             <div className="w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <span className="text-5xl font-display font-bold text-primary">
-                {user?.username?.charAt(0) || 'U'}
+                {user?.name?.charAt(0) || 'U'}
               </span>
             </div>
             <h3 className="font-display font-semibold text-lg text-foreground">
-              {user?.username || 'User'}
+              {user?.name || 'User'}
             </h3>
             <p className="text-sm text-muted-foreground capitalize">
               {user?.role || 'Faculty'}
@@ -107,7 +107,7 @@ export function ProfilePage() {
                   />
                 ) : (
                   <p className="text-foreground font-medium py-2">
-                    {user?.username || 'Not set'}
+                    {user?.name || 'Not set'}
                   </p>
                 )}
               </div>

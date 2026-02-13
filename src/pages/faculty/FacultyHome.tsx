@@ -4,10 +4,10 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { DataCard } from '@/components/dashboard/DataCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Clock, 
-  Calendar, 
-  FileText, 
+import {
+  Clock,
+  Calendar,
+  FileText,
   Bell,
   ArrowRight,
   MapPin,
@@ -47,8 +47,8 @@ export function FacultyHome() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <PageHeader 
-        title={`${greeting}, ${user?.username?.split(' ')[0] || 'Professor'}!`}
+      <PageHeader
+        title={`${greeting}, ${user?.name?.split(' ')[0] || 'Professor'}!`}
         description="Here's what's happening today"
       />
 
@@ -87,8 +87,8 @@ export function FacultyHome() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Upcoming Class Card */}
-        <DataCard 
-          title="Today's Schedule" 
+        <DataCard
+          title="Today's Schedule"
           className="lg:col-span-2"
           action={
             <Link to="/faculty/timetable">
@@ -137,7 +137,7 @@ export function FacultyHome() {
         </DataCard>
 
         {/* Leave Balance Card */}
-        <DataCard 
+        <DataCard
           title="Leave Balance"
           action={
             <Link to="/faculty/leave/apply">
@@ -163,7 +163,7 @@ export function FacultyHome() {
       </div>
 
       {/* Announcements */}
-      <DataCard 
+      <DataCard
         title="Recent Announcements"
         action={
           <Link to="/faculty/announcements">
@@ -176,15 +176,14 @@ export function FacultyHome() {
       >
         <div className="space-y-3">
           {recentAnnouncements.map((announcement) => (
-            <div 
+            <div
               key={announcement.id}
               className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-4">
-                <div className={`w-2 h-2 rounded-full ${
-                  announcement.priority === 'high' ? 'bg-destructive' :
-                  announcement.priority === 'medium' ? 'bg-warning' : 'bg-muted-foreground'
-                }`} />
+                <div className={`w-2 h-2 rounded-full ${announcement.priority === 'high' ? 'bg-destructive' :
+                    announcement.priority === 'medium' ? 'bg-warning' : 'bg-muted-foreground'
+                  }`} />
                 <span className="font-medium text-foreground">{announcement.title}</span>
               </div>
               <span className="text-sm text-muted-foreground">{announcement.time}</span>

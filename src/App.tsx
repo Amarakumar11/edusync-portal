@@ -11,7 +11,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
-import OTPVerificationPage from "./pages/auth/OTPVerificationPage";
+
 import NotFound from "./pages/NotFound";
 
 // Faculty Pages
@@ -45,7 +45,7 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             <Route path="/login/:role" element={<LoginPage />} />
             <Route path="/signup/faculty" element={<SignupPage />} />
-            <Route path="/verify-otp" element={<OTPVerificationPage />} />
+
 
             {/* Faculty Routes */}
             <Route path="/faculty" element={

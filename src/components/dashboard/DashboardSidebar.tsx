@@ -37,9 +37,9 @@ interface NavItemType {
 const facultyNavItems: NavItemType[] = [
   { title: 'Home', href: '/faculty', icon: Home },
   { title: 'My Timetable', href: '/faculty/timetable', icon: Calendar },
-  { 
-    title: 'Apply Leave', 
-    href: '/faculty/leave', 
+  {
+    title: 'Apply Leave',
+    href: '/faculty/leave',
     icon: FileText,
     subItems: [
       { title: 'Overview', href: '/faculty/leave' },
@@ -80,8 +80,8 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const navItems = role === 'admin' ? adminNavItems : facultyNavItems;
 
   const toggleExpanded = (title: string) => {
-    setExpandedItems(prev => 
-      prev.includes(title) 
+    setExpandedItems(prev =>
+      prev.includes(title)
         ? prev.filter(t => t !== title)
         : [...prev, title]
     );
@@ -105,11 +105,11 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-semibold">
-            {user?.username?.charAt(0) || 'U'}
+            {user?.name?.charAt(0) || 'U'}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {user?.username || 'User'}
+              {user?.name || 'User'}
             </p>
             <p className="text-xs text-sidebar-muted truncate">
               {user?.erpId || 'ERP ID'}
@@ -150,8 +150,8 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
                           onClick={() => setIsMobileOpen(false)}
                           className={({ isActive }) => cn(
                             'block px-3 py-2 rounded-lg text-sm transition-colors',
-                            isActive 
-                              ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+                            isActive
+                              ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                               : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'
                           )}
                         >
@@ -212,7 +212,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
 
       {/* Mobile Overlay */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
