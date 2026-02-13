@@ -1,4 +1,4 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+// Firebase Firestore-based leave application
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -9,14 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/dashboard/PageHeader';
-import { getCurrentUser } from '@/demoAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { createLeaveRequest } from '@/services/leaveService';
 import { createNotification } from '@/services/notificationService';
 
 export function ApplyLeavePage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const user = getCurrentUser();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -64,8 +64,8 @@ export function ApplyLeavePage() {
     setLoading(true);
 
     try {
-      // Create leave request
-      createLeaveRequest(
+      // Create leave request in Firestore
+      await createLeaveRequest(
         user.email,
         user.name,
         user.erpId || 'N/A',
@@ -75,8 +75,8 @@ export function ApplyLeavePage() {
         formData.toDate
       );
 
-      // Create notification for HOD
-      createNotification(
+      // Create notification for HOD in Firestore
+      await createNotification(
         'admin',
         user.department,
         `New leave request from ${user.name} (${user.erpId || 'N/A'}) from ${formData.fromDate} to ${formData.toDate}`

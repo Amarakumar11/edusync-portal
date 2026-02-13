@@ -1,12 +1,3 @@
-import { LeaveRequest, Announcement } from '../types/firestore';
-export async function createLeaveRequest(request: LeaveRequest) {
-  return createDoc<LeaveRequest>('leaveRequests', request);
-}
-
-// Example: Get announcements in real time (wrapper for generic helper)
-export function getAnnouncementsRealtime(cb: (data: Announcement[]) => void) {
-  return onCollectionSnapshot<Announcement>('announcements', cb);
-}
 import { db } from '../firebase';
 import {
   collection,
@@ -21,16 +12,18 @@ import {
   DocumentData,
   addDoc,
   query,
-  where
+  where,
 } from 'firebase/firestore';
 import {
   Admin,
   FacultyProfile,
   Timetable,
+  LeaveRequest,
+  Announcement,
   Event,
   Notification,
   Note,
-  ExamSchedule
+  ExamSchedule,
 } from '../types/firestore';
 
 // Generic CRUD helpers
@@ -59,37 +52,47 @@ export async function deleteDocData(col: string, id: string) {
 
 export async function readAllDocs<T>(col: string): Promise<T[]> {
   const snap = await getDocs(collection(db, col));
-  return snap.docs.map(d => d.data() as T);
+  return snap.docs.map((d) => d.data() as T);
 }
 
 export function onCollectionSnapshot<T>(col: string, cb: (data: T[]) => void) {
   return onSnapshot(collection(db, col), (snap: QuerySnapshot<DocumentData>) => {
-    cb(snap.docs.map(d => d.data() as T));
+    cb(snap.docs.map((d) => d.data() as T));
   });
 }
 
-// Example: Create faculty profile after signup
+// Create faculty profile after signup
 export async function createFacultyProfile(profile: FacultyProfile) {
   return createDoc<FacultyProfile>('faculties', profile, profile.uid);
 }
 
-// Example: Approve/reject leave request
+// Create leave request
+export async function createLeaveRequest(request: LeaveRequest) {
+  return createDoc<LeaveRequest>('leaveRequests', request);
+}
+
+// Approve/reject leave request
 export async function updateLeaveRequestStatus(id: string, status: 'approved' | 'rejected') {
   return updateDocData<LeaveRequest>('leaveRequests', id, { status } as any);
 }
 
-// Example: Send notification to one user
+// Send notification to one user
 export async function sendNotificationToUser(notification: Notification, userId: string) {
   return createDoc<Notification>(`faculties/${userId}/notifications`, notification);
 }
 
-// Example: Broadcast notification to all faculties
+// Broadcast notification to all faculties
 export async function broadcastNotification(notification: Notification) {
   const faculties = await readAllDocs<FacultyProfile>('faculties');
-  await Promise.all(faculties.map(f => sendNotificationToUser(notification, f.uid)));
+  await Promise.all(faculties.map((f) => sendNotificationToUser(notification, f.uid)));
 }
 
-// Example: Fetch announcements in real time
+// Get announcements in real time
+export function getAnnouncementsRealtime(cb: (data: Announcement[]) => void) {
+  return onCollectionSnapshot<Announcement>('announcements', cb);
+}
+
+// Fetch announcements in real time (alias)
 export function onAnnouncementsSnapshot(cb: (data: Announcement[]) => void) {
   return onCollectionSnapshot<Announcement>('announcements', cb);
 }
