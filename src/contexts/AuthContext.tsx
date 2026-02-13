@@ -1,185 +1,204 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { User, UserRole, LoginCredentials, SignUpData } from '@/types';
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  User as FirebaseUser,
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/firebase';
 
-// Predefined admin credentials (in production, this would be in a secure backend)
-const ADMIN_CREDENTIALS = {
-  username: 'Admin User',
-  email: 'admin@edusync.edu',
-  phone: '+1234567890',
-  erpId: 'ADMIN001',
-  password: 'admin123',
-};
+// ---- types ----
+export type UserRole = 'admin' | 'faculty';
+export type Department = 'CSE' | 'CSE_AIML' | 'CSE_AIDS' | 'CSE_DS' | 'ECE' | 'HS';
+
+export interface AppUser {
+  uid: string;
+  name: string;
+  email: string;
+  phone: string;
+  erpId: string;
+  role: UserRole;
+  department: Department;
+  createdAt: string;
+  profileImage?: string;
+}
 
 interface AuthState {
-  user: User | null;
+  user: AppUser | null;
+  firebaseUser: FirebaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  pendingOTP: boolean;
-  pendingUser: User | null;
 }
 
 interface AuthContextType extends AuthState {
-  login: (credentials: LoginCredentials, role: UserRole) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (data: SignUpData) => Promise<{ success: boolean; error?: string }>;
-  verifyOTP: (otp: string) => Promise<{ success: boolean; error?: string }>;
-  resendOTP: () => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
+}
+
+export interface SignUpData {
+  username: string;
+  email: string;
+  phone: string;
+  erpId: string;
+  password: string;
+  department: Department;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock faculty database (in production, this would be Firebase)
-const mockFacultyDB: Map<string, { user: User; password: string }> = new Map();
+/**
+ * Fetch the user profile document from Firestore.
+ * We first look in `users/{uid}`, which stores role, department, etc.
+ */
+async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<AppUser | null> {
+  try {
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      console.log(data);
+      return {
+        uid: firebaseUser.uid,
+        name: data.name || firebaseUser.displayName || '',
+        email: data.email || firebaseUser.email || '',
+        phone: data.phone || '',
+        erpId: data.erpId || '',
+        role: data.role || 'faculty',
+        department: data.department || 'CSE',
+        createdAt: data.createdAt || new Date().toISOString(),
+        profileImage: data.profileImage,
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching user profile:', err);
+    return null;
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
+    firebaseUser: null,
     isAuthenticated: false,
     isLoading: true,
-    pendingOTP: false,
-    pendingUser: null,
   });
 
-  // Check for existing session on mount
+  // Listen for Firebase auth state changes
   useEffect(() => {
-    const savedUser = localStorage.getItem('edusync_user');
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        setState(prev => ({
-          ...prev,
-          user,
-          isAuthenticated: true,
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const profile = await fetchUserProfile(firebaseUser);
+        setState({
+          firebaseUser,
+          user: profile,
+          isAuthenticated: !!profile,
           isLoading: false,
-        }));
-      } catch {
-        localStorage.removeItem('edusync_user');
-        setState(prev => ({ ...prev, isLoading: false }));
+        });
+      } else {
+        setState({
+          firebaseUser: null,
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
       }
-    } else {
-      setState(prev => ({ ...prev, isLoading: false }));
-    }
+    });
+    return () => unsub();
   }, []);
 
-  const login = useCallback(async (credentials: LoginCredentials, role: UserRole): Promise<{ success: boolean; error?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true }));
-
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    if (role === 'admin') {
-      if (credentials.erpId === ADMIN_CREDENTIALS.erpId && credentials.password === ADMIN_CREDENTIALS.password) {
-        const user: User = {
-          id: 'admin-1',
-          username: ADMIN_CREDENTIALS.username,
-          email: ADMIN_CREDENTIALS.email,
-          phone: ADMIN_CREDENTIALS.phone,
-          erpId: ADMIN_CREDENTIALS.erpId,
-          role: 'admin',
-          createdAt: new Date(),
-        };
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          pendingOTP: true,
-          pendingUser: user,
-        }));
-        return { success: true };
+  const login = useCallback(async (email: string, password: string) => {
+    setState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const profile = await fetchUserProfile(cred.user);
+      console.log("profile:");
+      console.log(profile);
+      if (!profile) {
+        await signOut(auth);
+        setState((prev) => ({ ...prev, isLoading: false }));
+        return { success: false, error: 'User profile not found. Please contact admin.' };
       }
-      setState(prev => ({ ...prev, isLoading: false }));
-      return { success: false, error: 'Invalid admin credentials' };
-    }
-
-    // Faculty login
-    const facultyData = mockFacultyDB.get(credentials.erpId);
-    if (facultyData && facultyData.password === credentials.password) {
-      setState(prev => ({
-        ...prev,
+      setState({
+        firebaseUser: cred.user,
+        user: profile,
+        isAuthenticated: true,
         isLoading: false,
-        pendingOTP: true,
-        pendingUser: facultyData.user,
-      }));
+      });
       return { success: true };
-    }
-
-    setState(prev => ({ ...prev, isLoading: false }));
-    return { success: false, error: 'Invalid ERP ID or password' };
-  }, []);
-
-  const signup = useCallback(async (data: SignUpData): Promise<{ success: boolean; error?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true }));
-
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Check if ERP ID already exists
-    if (mockFacultyDB.has(data.erpId)) {
-      setState(prev => ({ ...prev, isLoading: false }));
-      return { success: false, error: 'ERP ID already registered' };
-    }
-
-    // Create new faculty user
-    const newUser: User = {
-      id: `faculty-${Date.now()}`,
-      username: data.username,
-      email: data.email,
-      phone: data.phone,
-      erpId: data.erpId,
-      role: 'faculty',
-      createdAt: new Date(),
-    };
-
-    mockFacultyDB.set(data.erpId, { user: newUser, password: data.password });
-
-    setState(prev => ({ ...prev, isLoading: false }));
-    return { success: true };
-  }, []);
-
-  const verifyOTP = useCallback(async (otp: string): Promise<{ success: boolean; error?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true }));
-
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Mock OTP verification (accept any 6-digit code for demo)
-    if (otp.length === 6 && /^\d+$/.test(otp)) {
-      if (state.pendingUser) {
-        localStorage.setItem('edusync_user', JSON.stringify(state.pendingUser));
-        setState(prev => ({
-          ...prev,
-          user: prev.pendingUser,
-          isAuthenticated: true,
-          isLoading: false,
-          pendingOTP: false,
-          pendingUser: null,
-        }));
-        return { success: true };
+    } catch (err: any) {
+      setState((prev) => ({ ...prev, isLoading: false }));
+      const code = err?.code || '';
+      let message = 'Login failed. Please try again.';
+      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        message = 'Invalid email or password.';
+      } else if (code === 'auth/too-many-requests') {
+        message = 'Too many failed attempts. Please try again later.';
       }
+      return { success: false, error: message };
     }
-
-    setState(prev => ({ ...prev, isLoading: false }));
-    return { success: false, error: 'Invalid OTP. Please try again.' };
-  }, [state.pendingUser]);
-
-  const resendOTP = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('edusync_user');
+  const signup = useCallback(async (data: SignUpData) => {
+    setState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+
+      // Update display name
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: data.username });
+      }
+
+      // Create Firestore user profile
+      const profile: AppUser = {
+        uid: cred.user.uid,
+        name: data.username,
+        email: data.email,
+        phone: data.phone,
+        erpId: data.erpId,
+        role: 'faculty', // Signups are always faculty
+        department: data.department,
+        createdAt: new Date().toISOString(),
+      };
+
+      await setDoc(doc(db, 'users', cred.user.uid), profile);
+
+      // Sign out so user can log in themselves (or keep logged in if preferred)
+      await signOut(auth);
+
+      setState((prev) => ({ ...prev, isLoading: false }));
+      return { success: true };
+    } catch (err: any) {
+      setState((prev) => ({ ...prev, isLoading: false }));
+      const code = err?.code || '';
+      let message = 'Signup failed. Please try again.';
+      if (code === 'auth/email-already-in-use') {
+        message = 'This email is already registered.';
+      } else if (code === 'auth/weak-password') {
+        message = 'Password should be at least 6 characters.';
+      } else if (code === 'auth/invalid-email') {
+        message = 'Invalid email address.';
+      }
+      return { success: false, error: message };
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    await signOut(auth);
     setState({
+      firebaseUser: null,
       user: null,
       isAuthenticated: false,
       isLoading: false,
-      pendingOTP: false,
-      pendingUser: null,
     });
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, signup, verifyOTP, resendOTP, logout }}>
+    <AuthContext.Provider value={{ ...state, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

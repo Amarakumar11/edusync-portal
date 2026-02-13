@@ -1,5 +1,3 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
-
 export type Department = 'CSE' | 'CSE_AIML' | 'CSE_AIDS' | 'CSE_DS' | 'ECE' | 'HS';
 
 export interface LeaveRequest {

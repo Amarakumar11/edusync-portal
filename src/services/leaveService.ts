@@ -1,33 +1,29 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+// Firebase Firestore-based leave service
 
+import { db } from '@/firebase';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  Unsubscribe,
+  serverTimestamp,
+  Timestamp,
+} from 'firebase/firestore';
 import { LeaveRequest } from '@/types/leave';
 
-const LEAVE_STORAGE_KEY = 'edusync_leave_requests';
+const LEAVE_COLLECTION = 'leaveRequests';
 
 /**
- * Generate unique ID
+ * Create a new leave request in Firestore
  */
-function generateId(): string {
-  return `leave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Get all leave requests from localStorage
- */
-export function getAllLeaveRequests(): LeaveRequest[] {
-  try {
-    const data = localStorage.getItem(LEAVE_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error reading leave requests from localStorage:', error);
-    return [];
-  }
-}
-
-/**
- * Create a new leave request
- */
-export function createLeaveRequest(
+export async function createLeaveRequest(
   facultyEmail: string,
   facultyName: string,
   facultyErpId: string,
@@ -35,87 +31,149 @@ export function createLeaveRequest(
   reason: string,
   fromDate: string,
   toDate: string
-): LeaveRequest {
-  const leaveRequest: LeaveRequest = {
-    id: generateId(),
+): Promise<LeaveRequest> {
+  const leaveData = {
     facultyEmail,
     facultyName,
     facultyErpId,
-    department: department as any,
+    department,
     reason,
     fromDate,
     toDate,
-    status: 'pending',
+    status: 'pending' as const,
     createdAt: new Date().toISOString(),
   };
 
-  const allRequests = getAllLeaveRequests();
-  allRequests.push(leaveRequest);
+  const docRef = await addDoc(collection(db, LEAVE_COLLECTION), leaveData);
 
+  return {
+    id: docRef.id,
+    ...leaveData,
+  } as LeaveRequest;
+}
+
+/**
+ * Get all leave requests from Firestore
+ */
+export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
   try {
-    localStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(allRequests));
+    const snap = await getDocs(
+      query(collection(db, LEAVE_COLLECTION), orderBy('createdAt', 'desc'))
+    );
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
   } catch (error) {
-    console.error('Error saving leave request to localStorage:', error);
+    console.error('Error fetching leave requests:', error);
+    return [];
   }
-
-  return leaveRequest;
 }
 
 /**
  * Get leave requests by department
  */
-export function getLeaveRequestsByDepartment(department: string): LeaveRequest[] {
-  return getAllLeaveRequests().filter((req) => req.department === department);
+export async function getLeaveRequestsByDepartment(department: string): Promise<LeaveRequest[]> {
+  try {
+    const q = query(
+      collection(db, LEAVE_COLLECTION),
+      where('department', '==', department),
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+  } catch (error) {
+    console.error('Error fetching leave requests by department:', error);
+    return [];
+  }
 }
 
 /**
  * Get leave requests by faculty email
  */
-export function getLeaveRequestsByFaculty(email: string): LeaveRequest[] {
-  return getAllLeaveRequests().filter((req) => req.facultyEmail === email);
+export async function getLeaveRequestsByFaculty(email: string): Promise<LeaveRequest[]> {
+  try {
+    const q = query(
+      collection(db, LEAVE_COLLECTION),
+      where('facultyEmail', '==', email),
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+  } catch (error) {
+    console.error('Error fetching leave requests by faculty:', error);
+    return [];
+  }
 }
 
 /**
- * Update leave request status
+ * Update leave request status (approve/reject)
  */
-export function updateLeaveRequestStatus(
+export async function updateLeaveRequestStatus(
   leaveId: string,
   status: 'approved' | 'rejected'
-): LeaveRequest | null {
-  const allRequests = getAllLeaveRequests();
-  const leaveIndex = allRequests.findIndex((req) => req.id === leaveId);
-
-  if (leaveIndex === -1) {
-    return null;
-  }
-
-  allRequests[leaveIndex].status = status;
-
-  try {
-    localStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(allRequests));
-  } catch (error) {
-    console.error('Error updating leave request:', error);
-  }
-
-  return allRequests[leaveIndex];
+): Promise<void> {
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  await updateDoc(docRef, { status });
 }
 
 /**
  * Delete a leave request
  */
-export function deleteLeaveRequest(leaveId: string): boolean {
-  const allRequests = getAllLeaveRequests();
-  const filteredRequests = allRequests.filter((req) => req.id !== leaveId);
-
-  if (filteredRequests.length === allRequests.length) {
-    return false; // Not found
-  }
-
+export async function deleteLeaveRequest(leaveId: string): Promise<boolean> {
   try {
-    localStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(filteredRequests));
+    await deleteDoc(doc(db, LEAVE_COLLECTION, leaveId));
     return true;
   } catch (error) {
     console.error('Error deleting leave request:', error);
     return false;
   }
+}
+
+/**
+ * Listen to leave requests by department in real-time
+ */
+export function onLeaveRequestsByDepartment(
+  department: string,
+  callback: (requests: LeaveRequest[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, LEAVE_COLLECTION),
+    where('department', '==', department),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(q, (snap) => {
+    const requests = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+    callback(requests);
+  });
+}
+
+/**
+ * Listen to leave requests by faculty email in real-time
+ */
+export function onLeaveRequestsByFaculty(
+  email: string,
+  callback: (requests: LeaveRequest[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, LEAVE_COLLECTION),
+    where('facultyEmail', '==', email),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(q, (snap) => {
+    const requests = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+    callback(requests);
+  });
 }

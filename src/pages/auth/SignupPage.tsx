@@ -1,20 +1,29 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, Department } from '@/contexts/AuthContext';
 import { Logo } from '@/components/landing/Logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AlertCircle, ArrowLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const DEPARTMENTS: Department[] = ['CSE', 'CSE_AIML', 'CSE_AIDS', 'CSE_DS', 'ECE', 'HS'];
 
 export function SignupPage() {
   const navigate = useNavigate();
@@ -27,13 +36,14 @@ export function SignupPage() {
     erpId: '',
     password: '',
     confirmPassword: '',
+    department: '' as Department | '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const validateForm = () => {
-    if (!formData.username || !formData.email || !formData.phone || !formData.erpId || !formData.password) {
+    if (!formData.username || !formData.email || !formData.phone || !formData.erpId || !formData.password || !formData.department) {
       setError('Please fill in all fields');
       return false;
     }
@@ -73,6 +83,7 @@ export function SignupPage() {
       phone: formData.phone,
       erpId: formData.erpId,
       password: formData.password,
+      department: formData.department as Department,
     });
 
     if (result.success) {
@@ -127,15 +138,15 @@ export function SignupPage() {
       <div className="flex-1 flex items-center justify-center p-6 bg-background">
         <div className="w-full max-w-md">
           <div className="mb-8">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => navigate('/')}
               className="mb-6"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Home
             </Button>
-            
+
             <div className="lg:hidden mb-6">
               <Logo size="md" />
             </div>
@@ -194,16 +205,37 @@ export function SignupPage() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="erpId">ERP ID</Label>
-                  <Input
-                    id="erpId"
-                    placeholder="Enter your unique ERP ID"
-                    value={formData.erpId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, erpId: e.target.value }))}
-                    className="input-focus"
-                    disabled={isLoading}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="erpId">ERP ID</Label>
+                    <Input
+                      id="erpId"
+                      placeholder="e.g. ERP001"
+                      value={formData.erpId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, erpId: e.target.value }))}
+                      className="input-focus"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department</Label>
+                    <Select
+                      value={formData.department}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, department: value as Department }))}
+                      disabled={isLoading}
+                    >
+                      <SelectTrigger id="department">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DEPARTMENTS.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept.replace(/_/g, ' ')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -241,8 +273,8 @@ export function SignupPage() {
                   />
                 </div>
 
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="w-full bg-primary hover:bg-primary/90"
                   disabled={isLoading}
                 >
@@ -258,8 +290,8 @@ export function SignupPage() {
 
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{' '}
-                  <Link 
-                    to="/login/faculty" 
+                  <Link
+                    to="/login/faculty"
                     className="text-primary hover:underline font-medium"
                   >
                     Login

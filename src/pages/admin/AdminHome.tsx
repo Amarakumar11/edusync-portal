@@ -18,8 +18,8 @@ export function AdminHome() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <PageHeader 
-        title={`Welcome back, ${user?.username?.split(' ')[0] || 'Admin'}!`}
+      <PageHeader
+        title={`Welcome back, ${user?.name?.split(' ')[0] || 'Admin'}!`}
         description="Here's your admin dashboard overview"
       />
 
@@ -31,8 +31,8 @@ export function AdminHome() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <DataCard 
-          title="Pending Leave Requests" 
+        <DataCard
+          title="Pending Leave Requests"
           action={<Link to="/admin/leave-requests"><Button variant="ghost" size="sm">View All <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>}
         >
           <div className="space-y-3">

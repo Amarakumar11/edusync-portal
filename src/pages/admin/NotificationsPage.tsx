@@ -1,33 +1,43 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+// Firebase Firestore-based admin notifications page
 
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/dashboard/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/dashboard/EmptyState';
-import { getCurrentUser } from '@/demoAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { getAdminNotifications } from '@/services/notificationService';
 import { Notification } from '@/types/leave';
 import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export function AdminNotificationsPage() {
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [user]);
 
-  const loadNotifications = () => {
+  const loadNotifications = async () => {
     if (!user || user.role !== 'admin') {
       return;
     }
 
-    const notifs = getAdminNotifications(user.department);
-    setNotifications(notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    setLoading(false);
+    try {
+      const notifs = await getAdminNotifications(user.department);
+      setNotifications(
+        notifs.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      );
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!user || user.role !== 'admin') {
