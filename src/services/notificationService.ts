@@ -63,22 +63,39 @@ export async function getAllNotifications(): Promise<Notification[]> {
   }
 }
 
+
+// Define a converter for your Notification type
+const notificationConverter = {
+  toFirestore: (notification: Notification) => {
+    // Exclude the 'id' when writing to Firestore, as it's the document key
+    const { id, ...data } = notification; 
+    return data;
+  },
+  fromFirestore: (snapshot: any, options: any) => {
+    const data = snapshot.data(options);
+    return {
+      id: snapshot.id,
+      ...data
+    } as Notification; // Safe casting because we know the shape
+  }
+};
+
 /**
  * Get notifications for a faculty member by email
  */
+// Now your queries become type-safe and much cleaner:
 export async function getFacultyNotifications(email: string): Promise<Notification[]> {
   try {
     const q = query(
-      collection(db, NOTIFICATION_COLLECTION),
+      collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter), // <-- Apply converter here
       where('toRole', '==', 'faculty'),
       where('toEmail', '==', email),
       orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    })) as unknown as Notification[];
+    
+    // No mapping needed! snap.docs is already an array of Notification objects.
+    return snap.docs.map(doc => doc.data()); 
   } catch (error) {
     console.error('Error fetching faculty notifications:', error);
     return [];
