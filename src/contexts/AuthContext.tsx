@@ -60,6 +60,7 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<AppUser | n
     const snap = await getDoc(userDocRef);
     if (snap.exists()) {
       const data = snap.data();
+      console.log(data);
       return {
         uid: firebaseUser.uid,
         name: data.name || firebaseUser.displayName || '',
@@ -115,6 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const profile = await fetchUserProfile(cred.user);
+      console.log("profile:");
+      console.log(profile);
       if (!profile) {
         await signOut(auth);
         setState((prev) => ({ ...prev, isLoading: false }));
