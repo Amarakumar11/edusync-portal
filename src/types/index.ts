@@ -1,5 +1,5 @@
 // User Types
-export type UserRole = 'admin' | 'faculty';
+export type UserRole = 'hod' | 'faculty';
 
 export interface User {
   id: string;
@@ -12,8 +12,8 @@ export interface User {
   profileImage?: string;
 }
 
-export interface AdminUser extends User {
-  role: 'admin';
+export interface HODUser extends User {
+  role: 'hod';
 }
 
 export interface FacultyUser extends User {

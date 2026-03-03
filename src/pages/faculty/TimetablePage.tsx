@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/firebase';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/dashboard/PageHeader';
 import { DataCard } from '@/components/dashboard/DataCard';
 import { Button } from '@/components/ui/button';
@@ -60,40 +64,35 @@ const initTimetable = (): TimetableData => {
   return data;
 };
 
-// Mock initial data
-const mockTimetable: TimetableData = {
-  ...initTimetable(),
-  'Monday': {
-    ...initTimetable()['Monday'],
-    '10:00 - 11:00': { id: '1', subject: 'Data Structures', section: 'CSE-A', room: '301' },
-    '2:00 - 3:00': { id: '2', subject: 'Operating Systems', section: 'CSE-B', room: '302' },
-  },
-  'Tuesday': {
-    ...initTimetable()['Tuesday'],
-    '9:00 - 10:00': { id: '3', subject: 'Database Systems', section: 'CSE-A', room: 'Lab 201' },
-    '11:00 - 12:00': { id: '4', subject: 'Data Structures', section: 'CSE-C', room: '305' },
-  },
-  'Wednesday': {
-    ...initTimetable()['Wednesday'],
-    '10:00 - 11:00': { id: '5', subject: 'Computer Networks', section: 'CSE-A', room: '301' },
-  },
-  'Thursday': {
-    ...initTimetable()['Thursday'],
-    '2:00 - 3:00': { id: '6', subject: 'Database Systems', section: 'CSE-B', room: 'Lab 202' },
-  },
-  'Friday': {
-    ...initTimetable()['Friday'],
-    '9:00 - 10:00': { id: '7', subject: 'Operating Systems', section: 'CSE-A', room: '302' },
-    '3:00 - 4:00': { id: '8', subject: 'Data Structures', section: 'CSE-B', room: '301' },
-  },
-};
-
 export function TimetablePage() {
-  const [timetable, setTimetable] = useState<TimetableData>(mockTimetable);
+  const { user } = useAuth();
+  const [timetable, setTimetable] = useState<TimetableData>(initTimetable());
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ day: string; slot: string } | null>(null);
   const [formData, setFormData] = useState({ subject: '', section: '', room: '' });
   const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      if (!user?.uid) return;
+      try {
+        const docRef = doc(db, 'timetables', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().schedule) {
+          setTimetable(docSnap.data().schedule);
+        } else {
+          setTimetable(initTimetable());
+        }
+      } catch (error) {
+        console.error('Error fetching timetable:', error);
+        toast.error('Failed to load timetable');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTimetable();
+  }, [user]);
 
   const handleCellClick = (day: string, slot: string) => {
     setSelectedCell({ day, slot });
@@ -129,15 +128,24 @@ export function TimetablePage() {
     setIsDialogOpen(false);
   };
 
-  const handleSaveAll = () => {
-    // In production, this would save to Firebase
-    console.log('Saving timetable:', timetable);
-    setHasChanges(false);
+  const handleSaveAll = async () => {
+    if (!user?.uid) return;
+    try {
+      await setDoc(doc(db, 'timetables', user.uid), {
+        schedule: timetable,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      setHasChanges(false);
+      toast.success('Timetable saved successfully');
+    } catch (error) {
+      console.error('Error saving timetable:', error);
+      toast.error('Failed to save timetable');
+    }
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader 
+      <PageHeader
         title="My Timetable"
         description="Manage your class schedule"
       >
@@ -164,8 +172,8 @@ export function TimetablePage() {
             </thead>
             <tbody>
               {timeSlots.map((slot, slotIndex) => (
-                <tr 
-                  key={slot} 
+                <tr
+                  key={slot}
                   className={cn(
                     'border-b border-border',
                     slot === '12:00 - 1:00' && 'bg-muted/30'
@@ -221,15 +229,15 @@ export function TimetablePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {timetable[selectedCell?.day || '']?.[selectedCell?.slot || ''] 
-                ? 'Edit Class' 
+              {timetable[selectedCell?.day || '']?.[selectedCell?.slot || '']
+                ? 'Edit Class'
                 : 'Add Class'}
             </DialogTitle>
             <DialogDescription>
               {selectedCell?.day} • {selectedCell?.slot}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="subject">Subject</Label>
@@ -240,11 +248,11 @@ export function TimetablePage() {
                 onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="section">Section</Label>
-              <Select 
-                value={formData.section} 
+              <Select
+                value={formData.section}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, section: value }))}
               >
                 <SelectTrigger>
@@ -259,7 +267,7 @@ export function TimetablePage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="room">Room</Label>
               <Input

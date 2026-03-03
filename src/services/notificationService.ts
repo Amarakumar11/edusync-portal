@@ -23,7 +23,7 @@ const NOTIFICATION_COLLECTION = 'notifications';
  * Create a new notification in Firestore
  */
 export async function createNotification(
-  toRole: 'admin' | 'faculty',
+  toRole: 'hod' | 'faculty',
   toDepartment: string,
   message: string,
   toEmail?: string
@@ -68,7 +68,7 @@ export async function getAllNotifications(): Promise<Notification[]> {
 const notificationConverter = {
   toFirestore: (notification: Notification) => {
     // Exclude the 'id' when writing to Firestore, as it's the document key
-    const { id, ...data } = notification; 
+    const { id, ...data } = notification;
     return data;
   },
   fromFirestore: (snapshot: any, options: any) => {
@@ -93,9 +93,9 @@ export async function getFacultyNotifications(email: string): Promise<Notificati
       orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    
+
     // No mapping needed! snap.docs is already an array of Notification objects.
-    return snap.docs.map(doc => doc.data()); 
+    return snap.docs.map(doc => doc.data());
   } catch (error) {
     console.error('Error fetching faculty notifications:', error);
     return [];
@@ -103,13 +103,13 @@ export async function getFacultyNotifications(email: string): Promise<Notificati
 }
 
 /**
- * Get notifications for admin by department
+ * Get notifications for HOD by department
  */
-export async function getAdminNotifications(department: string): Promise<Notification[]> {
+export async function getHODNotifications(department: string): Promise<Notification[]> {
   try {
     const q = query(
       collection(db, NOTIFICATION_COLLECTION),
-      where('toRole', '==', 'admin'),
+      where('toRole', '==', 'hod'),
       where('toDepartment', '==', department),
       orderBy('createdAt', 'desc')
     );
@@ -168,15 +168,15 @@ export async function deleteNotification(notificationId: string): Promise<boolea
 }
 
 /**
- * Listen for admin notifications in real-time
+ * Listen for HOD notifications in real-time
  */
-export function onAdminNotifications(
+export function onHODNotifications(
   department: string,
   callback: (notifications: Notification[]) => void
 ): Unsubscribe {
   const q = query(
     collection(db, NOTIFICATION_COLLECTION),
-    where('toRole', '==', 'admin'),
+    where('toRole', '==', 'hod'),
     where('toDepartment', '==', department),
     orderBy('createdAt', 'desc')
   );

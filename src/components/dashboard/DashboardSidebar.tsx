@@ -54,17 +54,17 @@ const facultyNavItems: NavItemType[] = [
   { title: 'Profile', href: '/faculty/profile', icon: User },
 ];
 
-const adminNavItems: NavItemType[] = [
-  { title: 'Home', href: '/admin', icon: Home },
-  { title: 'My Timetable', href: '/admin/timetable', icon: Calendar },
-  { title: 'All Timetables', href: '/admin/all-timetables', icon: Upload },
-  { title: 'My Notes', href: '/admin/notes', icon: StickyNote },
-  { title: 'Leave Requests', href: '/admin/leave-requests', icon: ClipboardList, badge: 5 },
-  { title: 'Announcements', href: '/admin/announcements', icon: Megaphone },
-  { title: 'Events', href: '/admin/events', icon: CalendarDays },
-  { title: 'My Notifications', href: '/admin/notifications', icon: Bell, badge: 2 },
-  { title: 'Faculty Info', href: '/admin/faculty', icon: Users },
-  { title: 'Examination Info', href: '/admin/exams', icon: GraduationCap },
+const hodNavItems: NavItemType[] = [
+  { title: 'Home', href: '/hod', icon: Home },
+  { title: 'My Timetable', href: '/hod/timetable', icon: Calendar },
+  { title: 'All Timetables', href: '/hod/all-timetables', icon: Upload },
+  { title: 'My Notes', href: '/hod/notes', icon: StickyNote },
+  { title: 'Leave Requests', href: '/hod/leave-requests', icon: ClipboardList, badge: 5 },
+  { title: 'Announcements', href: '/hod/announcements', icon: Megaphone },
+  { title: 'Events', href: '/hod/events', icon: CalendarDays },
+  { title: 'My Notifications', href: '/hod/notifications', icon: Bell, badge: 2 },
+  { title: 'Faculty Info', href: '/hod/faculty', icon: Users },
+  { title: 'Examination Info', href: '/hod/exams', icon: GraduationCap },
 ];
 
 interface DashboardSidebarProps {
@@ -77,7 +77,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const navItems = role === 'admin' ? adminNavItems : facultyNavItems;
+  const navItems = role === 'hod' ? hodNavItems : facultyNavItems;
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev =>

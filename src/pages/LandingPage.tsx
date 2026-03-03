@@ -3,12 +3,12 @@ import { Logo } from '@/components/landing/Logo';
 import { FeatureCard } from '@/components/landing/FeatureCard';
 import { StatsCard } from '@/components/landing/StatsCard';
 import { Button } from '@/components/ui/button';
-import { 
-  Calendar, 
-  Clock, 
-  Bell, 
-  FileText, 
-  Users, 
+import {
+  Calendar,
+  Clock,
+  Bell,
+  FileText,
+  Users,
   Shield,
   ArrowRight,
   CheckCircle2
@@ -64,18 +64,18 @@ export function LandingPage() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Logo size="md" />
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => navigate('/login/faculty')}
               className="hidden sm:inline-flex"
             >
               Faculty Login
             </Button>
-            <Button 
-              onClick={() => navigate('/login/admin')}
+            <Button
+              onClick={() => navigate('/login/hod')}
               className="bg-primary hover:bg-primary/90"
             >
-              Admin Login
+              HOD Login
             </Button>
           </div>
         </div>
@@ -89,29 +89,29 @@ export function LandingPage() {
               <CheckCircle2 className="h-4 w-4" />
               Trusted by 50+ Educational Institutions
             </div>
-            
+
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-primary-foreground mb-6 opacity-0 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
               Streamline Your College{' '}
               <span className="text-primary-foreground/80">Administration</span>
             </h1>
-            
+
             <p className="text-lg sm:text-xl text-primary-foreground/70 mb-10 max-w-2xl mx-auto opacity-0 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-              EduSync is the modern, all-in-one portal for faculty and administrators. 
+              EduSync is the modern, all-in-one portal for faculty and administrators.
               Manage timetables, leaves, announcements, and more with ease.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center opacity-0 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-              <Button 
-                size="lg" 
-                onClick={() => navigate('/login/admin')}
+              <Button
+                size="lg"
+                onClick={() => navigate('/login/hod')}
                 className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold px-8"
               >
-                Admin Login
+                HOD Login
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
+              <Button
+                size="lg"
+                variant="outline"
                 onClick={() => navigate('/login/faculty')}
                 className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 font-semibold px-8"
               >
@@ -123,10 +123,10 @@ export function LandingPage() {
           {/* Stats */}
           <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
             {stats.map((stat, index) => (
-              <StatsCard 
-                key={stat.label} 
-                {...stat} 
-                delay={500 + index * 100} 
+              <StatsCard
+                key={stat.label}
+                {...stat}
+                delay={500 + index * 100}
               />
             ))}
           </div>
@@ -147,10 +147,10 @@ export function LandingPage() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {features.map((feature, index) => (
-              <FeatureCard 
-                key={feature.title} 
-                {...feature} 
-                delay={100 + index * 100} 
+              <FeatureCard
+                key={feature.title}
+                {...feature}
+                delay={100 + index * 100}
               />
             ))}
           </div>
@@ -168,21 +168,21 @@ export function LandingPage() {
               Join the growing community of educational institutions using EduSync to streamline their operations.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 onClick={() => navigate('/signup/faculty')}
                 className="bg-primary hover:bg-primary/90 font-semibold px-8"
               >
                 Register as Faculty
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                onClick={() => navigate('/login/admin')}
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate('/login/hod')}
                 className="font-semibold px-8"
               >
-                Admin Access
+                HOD Access
               </Button>
             </div>
           </div>

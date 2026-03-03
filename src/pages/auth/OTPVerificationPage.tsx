@@ -4,12 +4,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/components/landing/Logo';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card';
 import {
   InputOTP,
@@ -31,7 +31,7 @@ export function OTPVerificationPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate(user.role === 'admin' ? '/admin' : '/faculty');
+      navigate(user.role === 'hod' ? '/hod' : '/faculty');
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -72,14 +72,14 @@ export function OTPVerificationPage() {
     setError('');
     setCanResend(false);
     setResendCooldown(30);
-    
+
     const result = await resendOTP();
     if (!result.success) {
       setError('Failed to resend OTP. Please try again.');
     }
   };
 
-  const maskedPhone = pendingUser?.phone 
+  const maskedPhone = pendingUser?.phone
     ? `${pendingUser.phone.slice(0, 4)}****${pendingUser.phone.slice(-2)}`
     : '****';
 
@@ -132,7 +132,7 @@ export function OTPVerificationPage() {
               <p>Example: <code className="bg-muted px-2 py-0.5 rounded">123456</code></p>
             </div>
 
-            <Button 
+            <Button
               onClick={handleVerify}
               className="w-full bg-primary hover:bg-primary/90"
               disabled={isLoading || otp.length !== 6}
@@ -148,17 +148,17 @@ export function OTPVerificationPage() {
             </Button>
 
             <div className="flex items-center justify-between text-sm">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => navigate('/')}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Cancel
               </Button>
-              
-              <Button 
-                variant="ghost" 
+
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={handleResend}
                 disabled={!canResend}

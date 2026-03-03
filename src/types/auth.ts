@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'faculty';
+export type UserRole = 'hod' | 'faculty';
 
 export interface FacultyProfile {
   uid: string;

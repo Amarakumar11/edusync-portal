@@ -24,6 +24,8 @@ import {
 import { createNotification } from '@/services/notificationService';
 import { LeaveRequest } from '@/types/leave';
 import { FileText } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 export function LeaveRequestsPage() {
   const { user } = useAuth();
@@ -37,7 +39,7 @@ export function LeaveRequestsPage() {
   }, [user]);
 
   const loadLeaveRequests = async () => {
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== 'hod') {
       return;
     }
 
@@ -61,12 +63,34 @@ export function LeaveRequestsPage() {
 
     try {
       await updateLeaveRequestStatus(leaveRequest.id, 'approved');
+
+      // Notify the requester
       await createNotification(
         'faculty',
         leaveRequest.department,
         `Your leave request has been approved by HOD (${user?.department})`,
         leaveRequest.facultyEmail
       );
+
+      // Notify other faculty in the same department
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('role', '==', 'faculty'), where('department', '==', leaveRequest.department));
+      const colSnap = await getDocs(q);
+
+      const notificationsPromises = colSnap.docs.map(docSnap => {
+        const facultyData = docSnap.data();
+        if (facultyData.email !== leaveRequest.facultyEmail) {
+          return createNotification(
+            'faculty',
+            leaveRequest.department,
+            `${leaveRequest.facultyName} faculty is in leave so take the classes of that faculty by timetable schedule`,
+            facultyData.email
+          );
+        }
+        return Promise.resolve();
+      });
+
+      await Promise.all(notificationsPromises);
 
       toast({
         title: 'Success',
@@ -114,7 +138,7 @@ export function LeaveRequestsPage() {
     }
   };
 
-  if (!user || user.role !== 'admin') {
+  if (!user || user.role !== 'hod') {
     return null;
   }
 
@@ -154,6 +178,7 @@ export function LeaveRequestsPage() {
                   <TableRow>
                     <TableHead>Faculty Name</TableHead>
                     <TableHead>ERP ID</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>From Date</TableHead>
                     <TableHead>To Date</TableHead>
                     <TableHead>Reason</TableHead>
@@ -165,6 +190,7 @@ export function LeaveRequestsPage() {
                     <TableRow key={req.id}>
                       <TableCell className="font-medium">{req.facultyName}</TableCell>
                       <TableCell>{req.facultyErpId}</TableCell>
+                      <TableCell className="capitalize">{req.type}</TableCell>
                       <TableCell>{req.fromDate}</TableCell>
                       <TableCell>{req.toDate}</TableCell>
                       <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
@@ -210,6 +236,7 @@ export function LeaveRequestsPage() {
                   <TableRow>
                     <TableHead>Faculty Name</TableHead>
                     <TableHead>ERP ID</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>From Date</TableHead>
                     <TableHead>To Date</TableHead>
                     <TableHead>Status</TableHead>
@@ -220,6 +247,7 @@ export function LeaveRequestsPage() {
                     <TableRow key={req.id}>
                       <TableCell className="font-medium">{req.facultyName}</TableCell>
                       <TableCell>{req.facultyErpId}</TableCell>
+                      <TableCell className="capitalize">{req.type}</TableCell>
                       <TableCell>{req.fromDate}</TableCell>
                       <TableCell>{req.toDate}</TableCell>
                       <TableCell>
@@ -236,3 +264,5 @@ export function LeaveRequestsPage() {
     </div>
   );
 }
+
+export default LeaveRequestsPage;

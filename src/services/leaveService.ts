@@ -28,6 +28,7 @@ export async function createLeaveRequest(
   facultyName: string,
   facultyErpId: string,
   department: string,
+  type: 'casual' | 'paid' | 'sick',
   reason: string,
   fromDate: string,
   toDate: string
@@ -37,6 +38,7 @@ export async function createLeaveRequest(
     facultyName,
     facultyErpId,
     department,
+    type,
     reason,
     fromDate,
     toDate,
