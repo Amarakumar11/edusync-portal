@@ -96,15 +96,24 @@ export function ExamsPage() {
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `exams/${Date.now()}_${file.name}`);
-      const uploadResult = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(uploadResult.ref);
+      const formData = new FormData();
+      formData.append('file', file);
+      const serverPort = 3001;
+      const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
+      const response = await fetch(`${baseUrl}/api/upload/exams`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Failed to upload PDF');
+      const data = await response.json();
+      const url = data.url;
 
       await addDoc(collection(db, 'exam_schedules'), {
         title,
         examType,
         pdfUrl: url,
-        storagePath: storageRef.fullPath,
+        storagePath: url,
         uploadedBy: user.name,
         department: user.department || 'All',
         uploadedAt: new Date().toISOString()
@@ -126,7 +135,7 @@ export function ExamsPage() {
 
   const handleDelete = async (id: string, path: string) => {
     try {
-      if (path) {
+      if (path && !path.startsWith('/uploads/')) {
         const fileRef = ref(storage, path);
         await deleteObject(fileRef);
       }
@@ -146,7 +155,7 @@ export function ExamsPage() {
           title="Examination Info"
           description="View exam schedules and types"
         />
-        {user?.role === 'hod' && (
+        {(user?.role === 'hod' || user?.role === 'principal') && (
           <Button
             onClick={() => setShowUploadForm(!showUploadForm)}
             variant={showUploadForm ? "outline" : "default"}
@@ -156,7 +165,7 @@ export function ExamsPage() {
         )}
       </div>
 
-      {showUploadForm && user?.role === 'hod' && (
+      {showUploadForm && (user?.role === 'hod' || user?.role === 'principal') && (
         <DataCard title="Upload Exam Schedule" className="bg-muted/30 border-primary/20">
           <form onSubmit={handleUpload} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -278,7 +287,7 @@ export function ExamsPage() {
                           Download
                         </a>
                       </Button>
-                      {user?.role === 'hod' && (
+                      {(user?.role === 'hod' || user?.role === 'principal') && (
                         <Button
                           variant="destructive"
                           size="sm"

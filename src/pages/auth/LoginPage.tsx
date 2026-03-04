@@ -30,6 +30,7 @@ export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const isHOD = role === 'hod';
+  const isPrincipal = role === 'principal';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +43,7 @@ export function LoginPage() {
 
     setIsLoading(true);
     try {
-      const currentRole = isHOD ? 'hod' : 'faculty';
+      const currentRole = isPrincipal ? 'principal' : isHOD ? 'hod' : 'faculty';
       const result = await login(formData.identifier, formData.password, currentRole);
 
       if (!result.success) {
@@ -51,8 +52,7 @@ export function LoginPage() {
         return;
       }
 
-      // Successful login triggers OTP verification flow
-      navigate('/verify-otp');
+      navigate(`/${currentRole}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       setIsLoading(false);
@@ -66,12 +66,14 @@ export function LoginPage() {
         <div className="max-w-md text-center">
           <Logo variant="light" size="lg" className="justify-center mb-8" />
           <h2 className="font-display text-3xl font-bold text-primary-foreground mb-4">
-            {isHOD ? 'HOD Portal' : 'Faculty Portal'}
+            {isPrincipal ? 'Principal Portal' : isHOD ? 'HOD Portal' : 'Faculty Portal'}
           </h2>
           <p className="text-primary-foreground/70">
-            {isHOD
-              ? 'Manage your institution with powerful administrative tools.'
-              : 'Access your schedule, apply for leave, and stay connected.'}
+            {isPrincipal
+              ? 'Oversee the entire institution with comprehensive oversight.'
+              : isHOD
+                ? 'Manage your institution with powerful administrative tools.'
+                : 'Access your schedule, apply for leave, and stay connected.'}
           </p>
         </div>
       </div>
@@ -97,7 +99,7 @@ export function LoginPage() {
           <Card className="border-0 shadow-lg">
             <CardHeader className="space-y-1">
               <CardTitle className="font-display text-2xl">
-                {isHOD ? 'HOD Login' : 'Faculty Login'}
+                {isPrincipal ? 'Principal Login' : isHOD ? 'HOD Login' : 'Faculty Login'}
               </CardTitle>
               <CardDescription>
                 Enter your credentials to access your dashboard
@@ -113,11 +115,13 @@ export function LoginPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="identifier">{isHOD ? 'Email' : 'ERP ID'}</Label>
+                  <Label htmlFor="identifier">
+                    {isPrincipal || isHOD ? 'Email' : 'ERP ID'}
+                  </Label>
                   <Input
                     id="identifier"
-                    type={isHOD ? 'email' : 'text'}
-                    placeholder={isHOD ? 'Enter your email' : 'Enter your ERP ID (e.g. ERP001)'}
+                    type={isPrincipal || isHOD ? 'email' : 'text'}
+                    placeholder={isPrincipal || isHOD ? 'Enter your email' : 'Enter your ERP ID (e.g. ERP001)'}
                     value={formData.identifier}
                     onChange={(e) => setFormData(prev => ({ ...prev, identifier: e.target.value }))}
                     className="input-focus"
@@ -162,7 +166,7 @@ export function LoginPage() {
                   )}
                 </Button>
 
-                {!isHOD && (
+                {!isHOD && !isPrincipal && (
                   <p className="text-center text-sm text-muted-foreground">
                     Don't have an account?{' '}
                     <Link

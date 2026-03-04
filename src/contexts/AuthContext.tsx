@@ -11,8 +11,8 @@ import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase
 import { auth, db } from '@/firebase';
 
 // ---- types ----
-export type UserRole = 'hod' | 'faculty';
-export type Department = 'CSE' | 'CSE_AIML' | 'CSE_AIDS' | 'CSE_DS' | 'ECE' | 'HS';
+export type UserRole = 'hod' | 'faculty' | 'principal';
+export type Department = 'CSE' | 'CSE_AIML' | 'CSE_AIDS' | 'CSE_DS' | 'ECE' | 'HS' | 'ALL';
 
 export interface AppUser {
   uid: string;
@@ -93,9 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const profile = await fetchUserProfile(firebaseUser);
-        const otpVerified = sessionStorage.getItem('edusync_otp_verified') === 'true';
-
-        if (otpVerified && profile) {
+        if (profile) {
           setState({
             firebaseUser,
             user: profile,
@@ -103,15 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isLoading: false,
             pendingUser: null,
             pendingOTP: false,
-          });
-        } else if (profile) {
-          setState({
-            firebaseUser,
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-            pendingUser: profile,
-            pendingOTP: true,
           });
         } else {
           setState({
@@ -172,16 +161,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: `Unauthorized access. Expected ${role} role.` };
       }
 
-      // Start OTP Flow
-      sessionStorage.removeItem('edusync_otp_verified');
-      console.log(`Mock OTP sent to ${profile.phone}`);
-
       setState({
         firebaseUser: cred.user,
-        user: null,
-        pendingUser: profile,
-        pendingOTP: true,
-        isAuthenticated: false,
+        user: profile,
+        pendingUser: null,
+        pendingOTP: false,
+        isAuthenticated: true,
         isLoading: false,
       });
       return { success: true };

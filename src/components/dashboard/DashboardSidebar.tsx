@@ -23,6 +23,7 @@ import {
   Users,
   StickyNote,
   Upload,
+  BookOpen,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
 
@@ -65,6 +66,19 @@ const hodNavItems: NavItemType[] = [
   { title: 'My Notifications', href: '/hod/notifications', icon: Bell, badge: 2 },
   { title: 'Faculty Info', href: '/hod/faculty', icon: Users },
   { title: 'Examination Info', href: '/hod/exams', icon: GraduationCap },
+  { title: 'Profile', href: '/hod/profile', icon: User },
+];
+
+const principalNavItems: NavItemType[] = [
+  { title: 'Home', href: '/principal', icon: Home },
+  { title: 'All Timetables', href: '/principal/all-timetables', icon: Calendar },
+  { title: 'Faculty & HODs Info', href: '/principal/faculty', icon: Users },
+  { title: 'Announcements', href: '/principal/announcements', icon: Megaphone },
+  { title: 'Events', href: '/principal/events', icon: CalendarDays },
+  { title: 'Examination Info', href: '/principal/exams', icon: GraduationCap },
+  { title: 'Profile', href: '/principal/profile', icon: User },
+  { title: 'Classes', href: '/principal/classes', icon: BookOpen },
+  { title: 'Settings', href: '/principal/settings', icon: Menu },
 ];
 
 interface DashboardSidebarProps {
@@ -77,7 +91,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const navItems = role === 'hod' ? hodNavItems : facultyNavItems;
+  const navItems = role === 'principal' ? principalNavItems : (role === 'hod' ? hodNavItems : facultyNavItems);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev =>
@@ -104,8 +118,12 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
       {/* User Info */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-semibold">
-            {user?.name?.charAt(0) || 'U'}
+          <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-semibold overflow-hidden">
+            {user?.profileImage ? (
+              <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              user?.name?.charAt(0) || 'U'
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">

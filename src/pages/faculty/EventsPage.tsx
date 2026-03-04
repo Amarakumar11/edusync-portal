@@ -137,9 +137,18 @@ export function EventsPage() {
     let pdfUrl = '';
     try {
       if (file) {
-        const storageRef = ref(storage, `events/${Date.now()}_${file.name}`);
-        const uploadResult = await uploadBytes(storageRef, file);
-        pdfUrl = await getDownloadURL(uploadResult.ref);
+        const formData = new FormData();
+        formData.append('file', file);
+        const serverPort = 3001;
+        const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
+        const response = await fetch(`${baseUrl}/api/upload/events`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error('Failed to upload PDF');
+        const data = await response.json();
+        pdfUrl = data.url;
       }
 
       await addDoc(collection(db, 'events'), {
@@ -184,7 +193,7 @@ export function EventsPage() {
           title="Events"
           description="Stay updated with college events"
         />
-        {user?.role === 'hod' && (
+        {(user?.role === 'hod' || user?.role === 'principal') && (
           <Button
             onClick={() => setShowPublishForm(!showPublishForm)}
             variant={showPublishForm ? "outline" : "default"}
@@ -194,7 +203,7 @@ export function EventsPage() {
         )}
       </div>
 
-      {showPublishForm && user?.role === 'hod' && (
+      {showPublishForm && (user?.role === 'hod' || user?.role === 'principal') && (
         <DataCard title="Create New Event" className="bg-muted/30 border-primary/20">
           <form onSubmit={handlePublish} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -72,10 +72,17 @@ export function LandingPage() {
               Faculty Login
             </Button>
             <Button
+              variant="ghost"
               onClick={() => navigate('/login/hod')}
-              className="bg-primary hover:bg-primary/90"
+              className="hidden sm:inline-flex"
             >
               HOD Login
+            </Button>
+            <Button
+              onClick={() => navigate('/login/principal')}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Principal Login
             </Button>
           </div>
         </div>
@@ -103,11 +110,19 @@ export function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center opacity-0 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
               <Button
                 size="lg"
-                onClick={() => navigate('/login/hod')}
+                onClick={() => navigate('/login/principal')}
                 className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 font-semibold px-8"
               >
-                HOD Login
+                Principal Login
                 <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate('/login/hod')}
+                className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 font-semibold px-8"
+              >
+                HOD Login
               </Button>
               <Button
                 size="lg"

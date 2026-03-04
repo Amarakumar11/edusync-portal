@@ -14,12 +14,12 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-db.settings({ databaseId: 'default' });
 const auth = admin.auth();
 
 // ── Seed data ────────────────────────────────────
 const SEED_USERS = [
-  { email: 'hod.harsh@mrce.com', password: 'Admin@cse123', name: 'HOD CSE', phone: '+917660873570', erpId: 'HOD_CSE', role: 'hod', department: 'CSE' },
+  { email: 'principal@edusync.com', password: 'Admin@prin123', name: 'Principal', phone: '+919999999999', erpId: 'PRINCIPAL', role: 'principal', department: 'ALL' },
+  // { email: 'hod.harsh@mrce.com', password: 'Admin@cse123', name: 'HOD CSE', phone: '+917660873570', erpId: 'HOD_CSE', role: 'hod', department: 'CSE' },
   // { email: 'hod.cse_aiml@edusync.com', password: 'Admin@csm123', name: 'HOD CSE (AIML)', phone: '+919876543211', erpId: 'HOD_CSE_AIML', role: 'hod', department: 'CSE_AIML' },
   // { email: 'hod.cse_aids@edusync.com', password: 'Admin@aids123', name: 'HOD CSE (AIDS)', phone: '+919876543212', erpId: 'HOD_CSE_AIDS', role: 'hod', department: 'CSE_AIDS' },
   // { email: 'hod.cse_ds@edusync.com', password: 'Admin@ds123', name: 'HOD CSE (DS)', phone: '+919876543213', erpId: 'HOD_CSE_DS', role: 'hod', department: 'CSE_DS' },

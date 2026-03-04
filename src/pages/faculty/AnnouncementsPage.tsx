@@ -120,7 +120,7 @@ export function AnnouncementsPage() {
           title="Announcements"
           description="Stay updated with the latest announcements"
         />
-        {user?.role === 'hod' && (
+        {(user?.role === 'hod' || user?.role === 'principal') && (
           <Button
             onClick={() => setShowPublishForm(!showPublishForm)}
             variant={showPublishForm ? "outline" : "default"}
@@ -130,7 +130,7 @@ export function AnnouncementsPage() {
         )}
       </div>
 
-      {showPublishForm && user?.role === 'hod' && (
+      {showPublishForm && (user?.role === 'hod' || user?.role === 'principal') && (
         <DataCard title="Publish Announcement" className="bg-muted/30 border-primary/20">
           <form onSubmit={handlePublish} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -204,7 +204,7 @@ export function AnnouncementsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div className="flex items-start gap-3 w-full">
                     <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${announcement.priority === 'high' ? 'bg-destructive' :
-                        announcement.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
+                      announcement.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
                       }`} />
                     <div className="flex-1">
                       <h3 className="font-display font-semibold text-lg text-foreground mb-1">

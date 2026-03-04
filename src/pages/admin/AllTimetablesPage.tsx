@@ -39,9 +39,18 @@ export function AllTimetablesPage() {
 
         setIsUploading(true);
         try {
-            const storageRef = ref(storage, `timetables/${Date.now()}_${file.name}`);
-            const uploadResult = await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(uploadResult.ref);
+            const formData = new FormData();
+            formData.append('file', file);
+            const serverPort = 3001;
+            const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
+            const response = await fetch(`${baseUrl}/api/upload/all-timetables`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error('Failed to upload PDF');
+            const data = await response.json();
+            const url = data.url;
 
             await addDoc(collection(db, 'timetable_pdfs'), {
                 title,
@@ -49,7 +58,7 @@ export function AllTimetablesPage() {
                 uploadedBy: user.name,
                 createdAt: new Date().toISOString(),
                 fileName: file.name,
-                storagePath: storageRef.fullPath
+                storagePath: url
             });
 
             toast.success('Timetable uploaded successfully');
@@ -66,8 +75,10 @@ export function AllTimetablesPage() {
 
     const handleDelete = async (id: string, path: string) => {
         try {
-            const fileRef = ref(storage, path);
-            await deleteObject(fileRef);
+            if (path && !path.startsWith('/uploads/')) {
+                const fileRef = ref(storage, path);
+                await deleteObject(fileRef);
+            }
             await deleteDoc(doc(db, 'timetable_pdfs', id));
             toast.success('Timetable deleted');
             fetchTimetables();
