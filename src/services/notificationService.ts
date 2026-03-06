@@ -87,15 +87,16 @@ const notificationConverter = {
 export async function getFacultyNotifications(email: string): Promise<Notification[]> {
   try {
     const q = query(
-      collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter), // <-- Apply converter here
+      collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter),
       where('toRole', '==', 'faculty'),
-      where('toEmail', '==', email),
-      orderBy('createdAt', 'desc')
+      where('toEmail', '==', email)
     );
     const snap = await getDocs(q);
 
-    // No mapping needed! snap.docs is already an array of Notification objects.
-    return snap.docs.map(doc => doc.data());
+    // Sort client-side instead of orderBy to avoid composite index requirement
+    return snap.docs.map(doc => doc.data()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   } catch (error) {
     console.error('Error fetching faculty notifications:', error);
     return [];
@@ -110,14 +111,14 @@ export async function getHODNotifications(department: string): Promise<Notificat
     const q = query(
       collection(db, NOTIFICATION_COLLECTION),
       where('toRole', '==', 'hod'),
-      where('toDepartment', '==', department),
-      orderBy('createdAt', 'desc')
+      where('toDepartment', '==', department)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({
+    const results = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as unknown as Notification[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
     console.error('Error fetching admin notifications:', error);
     return [];
@@ -177,14 +178,14 @@ export function onHODNotifications(
   const q = query(
     collection(db, NOTIFICATION_COLLECTION),
     where('toRole', '==', 'hod'),
-    where('toDepartment', '==', department),
-    orderBy('createdAt', 'desc')
+    where('toDepartment', '==', department)
   );
   return onSnapshot(q, (snap) => {
     const notifs = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as unknown as Notification[];
+    notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     callback(notifs);
   });
 }
@@ -199,14 +200,14 @@ export function onFacultyNotifications(
   const q = query(
     collection(db, NOTIFICATION_COLLECTION),
     where('toRole', '==', 'faculty'),
-    where('toEmail', '==', email),
-    orderBy('createdAt', 'desc')
+    where('toEmail', '==', email)
   );
   return onSnapshot(q, (snap) => {
     const notifs = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as unknown as Notification[];
+    notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     callback(notifs);
   });
 }

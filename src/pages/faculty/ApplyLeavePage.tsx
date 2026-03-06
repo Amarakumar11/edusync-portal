@@ -20,6 +20,8 @@ import { createLeaveRequest, getLeaveRequestsByFaculty } from '@/services/leaveS
 import { createNotification } from '@/services/notificationService';
 import { LeaveRequest } from '@/types/leave';
 import { format, isWithinInterval, parseISO } from 'date-fns';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 export function ApplyLeavePage() {
   const navigate = useNavigate();
@@ -42,25 +44,39 @@ export function ApplyLeavePage() {
 
   useEffect(() => {
     if (user?.email) {
-      getLeaveRequestsByFaculty(user.email).then(reqs => {
-        setLeaveHistory(reqs);
-        // Calculate used leaves
-        let usedCasual = 0, usedPaid = 0, usedSick = 0;
-        reqs.forEach(r => {
-          if (r.status === 'approved') {
-            const days = Math.floor((new Date(r.toDate).getTime() - new Date(r.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-            if (r.type === 'casual') usedCasual += days;
-            if (r.type === 'paid') usedPaid += days;
-            if (r.type === 'sick') usedSick += days;
+      const fetchLeaveData = async () => {
+        let quotas = { casual: 15, paid: 12, sick: 5 };
+        try {
+          const docRef = doc(db, 'settings', 'college');
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists() && docSnap.data().leaveQuotas) {
+            quotas = docSnap.data().leaveQuotas;
           }
+        } catch (error) {
+          console.error("Error fetching leave quotas", error);
+        }
+
+        getLeaveRequestsByFaculty(user.email).then(reqs => {
+          setLeaveHistory(reqs);
+          // Calculate used leaves
+          let usedCasual = 0, usedPaid = 0, usedSick = 0;
+          reqs.forEach(r => {
+            if (r.status === 'approved') {
+              const days = Math.floor((new Date(r.toDate).getTime() - new Date(r.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              if (r.type === 'casual') usedCasual += days;
+              if (r.type === 'paid') usedPaid += days;
+              if (r.type === 'sick') usedSick += days;
+            }
+          });
+          setBalances({
+            casual: Math.max(0, quotas.casual - usedCasual),
+            paid: Math.max(0, quotas.paid - usedPaid),
+            sick: Math.max(0, quotas.sick - usedSick)
+          });
+          setFetchingHistory(false);
         });
-        setBalances({
-          casual: Math.max(0, 15 - usedCasual),
-          paid: Math.max(0, 12 - usedPaid),
-          sick: Math.max(0, 5 - usedSick)
-        });
-        setFetchingHistory(false);
-      });
+      };
+      fetchLeaveData();
     }
   }, [user]);
 

@@ -109,13 +109,19 @@ export function EventsPage() {
     try {
       const q = query(collection(db, 'events'), orderBy('date', 'asc'));
       const snapshot = await getDocs(q);
-      const fetched = snapshot.docs.map(doc => ({
+      let fetched = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Event[];
 
-      // Optionally filter by department if needed
-      // const filtered = fetched.filter(e => e.department === user?.department || e.department === 'All');
+      // Filter by department
+      if (user?.role === 'faculty' || user?.role === 'hod') {
+        fetched = fetched.filter(e =>
+          e.department?.toLowerCase() === user.department?.toLowerCase() ||
+          e.department?.toLowerCase() === 'all'
+        );
+      }
+
       setEvents(fetched);
     } catch (error) {
       console.error('Error fetching events:', error);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/components/landing/Logo';
@@ -26,6 +26,8 @@ import {
   BookOpen,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 interface NavItemType {
   title: string;
@@ -44,13 +46,13 @@ const facultyNavItems: NavItemType[] = [
     icon: FileText,
     subItems: [
       { title: 'Overview', href: '/faculty/leave' },
-      { title: 'Apply', href: '/faculty/leave/apply' },
+      { title: 'Apply', href: '/faculty/apply-leave' },
     ]
   },
   { title: 'Leave History', href: '/faculty/leave-history', icon: History },
   { title: 'Announcements', href: '/faculty/announcements', icon: Megaphone },
   { title: 'Events', href: '/faculty/events', icon: CalendarDays },
-  { title: 'My Notifications', href: '/faculty/notifications', icon: Bell, badge: 3 },
+  { title: 'My Notifications', href: '/faculty/notifications', icon: Bell },
   { title: 'Examination Info', href: '/faculty/exams', icon: GraduationCap },
   { title: 'Profile', href: '/faculty/profile', icon: User },
 ];
@@ -60,10 +62,10 @@ const hodNavItems: NavItemType[] = [
   { title: 'My Timetable', href: '/hod/timetable', icon: Calendar },
   { title: 'All Timetables', href: '/hod/all-timetables', icon: Upload },
   { title: 'My Notes', href: '/hod/notes', icon: StickyNote },
-  { title: 'Leave Requests', href: '/hod/leave-requests', icon: ClipboardList, badge: 5 },
+  { title: 'Leave Requests', href: '/hod/leave-requests', icon: ClipboardList },
   { title: 'Announcements', href: '/hod/announcements', icon: Megaphone },
   { title: 'Events', href: '/hod/events', icon: CalendarDays },
-  { title: 'My Notifications', href: '/hod/notifications', icon: Bell, badge: 2 },
+  { title: 'My Notifications', href: '/hod/notifications', icon: Bell },
   { title: 'Faculty Info', href: '/hod/faculty', icon: Users },
   { title: 'Examination Info', href: '/hod/exams', icon: GraduationCap },
   { title: 'Profile', href: '/hod/profile', icon: User },
@@ -90,6 +92,45 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const { logout, user } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [pendingLeaves, setPendingLeaves] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let unsubNotifs = () => { };
+    let unsubLeaves = () => { };
+
+    // 1. Unread Notifications
+    const notifsQuery = user.role === 'hod'
+      ? query(collection(db, 'notifications'), where('toRole', '==', 'hod'), where('toDepartment', '==', user.department))
+      : query(collection(db, 'notifications'), where('toRole', '==', 'faculty'), where('toEmail', '==', user.email));
+
+    unsubNotifs = onSnapshot(notifsQuery, (snap) => {
+      let unread = 0;
+      snap.forEach(doc => {
+        if (!doc.data().read) unread++;
+      });
+      setUnreadNotifications(unread);
+    });
+
+    // 2. Pending Leave Requests (HOD only)
+    if (user.role === 'hod') {
+      const leavesQuery = query(collection(db, 'leaveRequests'), where('department', '==', user.department));
+      unsubLeaves = onSnapshot(leavesQuery, (snap) => {
+        let pending = 0;
+        snap.forEach(doc => {
+          if (doc.data().status === 'pending') pending++;
+        });
+        setPendingLeaves(pending);
+      });
+    }
+
+    return () => {
+      unsubNotifs();
+      unsubLeaves();
+    };
+  }, [user]);
 
   const navItems = role === 'principal' ? principalNavItems : (role === 'hod' ? hodNavItems : facultyNavItems);
 
@@ -106,6 +147,12 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
       return location.pathname === href;
     }
     return location.pathname.startsWith(href);
+  };
+
+  const getBadgeCount = (title: string, staticBadge?: number) => {
+    if (title === 'My Notifications' && unreadNotifications > 0) return unreadNotifications;
+    if (title === 'Leave Requests' && pendingLeaves > 0) return pendingLeaves;
+    return staticBadge;
   };
 
   const SidebarContent = () => (
@@ -191,9 +238,9 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
                 >
                   <item.icon className="h-5 w-5" />
                   <span className="flex-1">{item.title}</span>
-                  {item.badge && (
+                  {getBadgeCount(item.title, item.badge) !== undefined && (
                     <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-medium rounded-full bg-sidebar-primary text-sidebar-primary-foreground">
-                      {item.badge}
+                      {getBadgeCount(item.title, item.badge)}
                     </span>
                   )}
                 </NavLink>

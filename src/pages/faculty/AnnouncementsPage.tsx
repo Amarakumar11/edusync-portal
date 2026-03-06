@@ -58,7 +58,10 @@ export function AnnouncementsPage() {
 
       // Filter by department
       if (user.role === 'hod' || user.role === 'faculty') {
-        fetched = fetched.filter(a => a.department === user.department || a.department === 'All');
+        fetched = fetched.filter(a =>
+          a.department?.toLowerCase() === user.department?.toLowerCase() ||
+          a.department?.toLowerCase() === 'all'
+        );
       }
 
       setAnnouncements(fetched);

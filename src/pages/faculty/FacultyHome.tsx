@@ -37,9 +37,16 @@ export function FacultyHome() {
     const fetchDashboardData = async () => {
       try {
         // 1. Leave Balances & Pending Requests
+        let quotas = { casual: 15, paid: 12, sick: 5 };
+        const docRef = doc(db, 'settings', 'college');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().leaveQuotas) {
+          quotas = docSnap.data().leaveQuotas;
+        }
+
         const leaves = await getLeaveRequestsByFaculty(user.email);
         let used = 0;
-        let casual = 15, paid = 12, sick = 5;
+        let casual = quotas.casual, paid = quotas.paid, sick = quotas.sick;
         let pending = 0;
 
         leaves.forEach(r => {
@@ -53,7 +60,13 @@ export function FacultyHome() {
             if (r.type === 'sick') sick -= days;
           }
         });
-        setLeaveBalance({ casual: Math.max(0, casual), paid: Math.max(0, paid), sick: Math.max(0, sick), total: 32, used });
+        setLeaveBalance({
+          casual: Math.max(0, casual),
+          paid: Math.max(0, paid),
+          sick: Math.max(0, sick),
+          total: quotas.casual + quotas.paid + quotas.sick,
+          used
+        });
         setPendingRequestsCount(pending);
 
         // 2. Unread Notifications

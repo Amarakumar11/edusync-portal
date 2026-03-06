@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getLeaveRequestsByFaculty } from '@/services/leaveService';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/firebase';
 import { PageHeader } from '@/components/dashboard/PageHeader';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { DataCard } from '@/components/dashboard/DataCard';
@@ -7,21 +11,9 @@ import { Calendar, FileText, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
-const leaveBalance = {
-  casual: 8,
-  paid: 12,
-  sick: 5,
-  total: 25,
-};
+// Removed static leaveBalance
 
-// Mock leave data for calendar
-const leaveData = [
-  { date: new Date(2024, 0, 15), type: 'casual' },
-  { date: new Date(2024, 0, 22), type: 'sick' },
-  { date: new Date(2024, 0, 23), type: 'sick' },
-  { date: new Date(2024, 1, 5), type: 'paid' },
-  { date: new Date(2024, 1, 6), type: 'paid' },
-];
+// Replaced mock leave data with state
 
 const getLeaveColor = (type: string) => {
   switch (type) {
@@ -41,21 +33,64 @@ const getFirstDayOfMonth = (year: number, month: number) => {
 };
 
 export function LeaveHome() {
+  const { user } = useAuth();
   const [currentDate] = useState(new Date());
   const [viewMonth, setViewMonth] = useState(currentDate.getMonth());
   const [viewYear, setViewYear] = useState(currentDate.getFullYear());
 
+  const [leaveBalance, setLeaveBalance] = useState({ casual: 0, paid: 0, sick: 0, total: 0 });
+  const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user?.email) {
+      const fetchLeaveData = async () => {
+        let quotas = { casual: 15, paid: 12, sick: 5 };
+        try {
+          const docRef = doc(db, 'settings', 'college');
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists() && docSnap.data().leaveQuotas) {
+            quotas = docSnap.data().leaveQuotas;
+          }
+        } catch (error) {
+          console.error("Error fetching leave quotas", error);
+        }
+
+        getLeaveRequestsByFaculty(user.email).then(reqs => {
+          setLeaveHistory(reqs);
+          let usedCasual = 0, usedPaid = 0, usedSick = 0;
+          reqs.forEach(r => {
+            if (r.status === 'approved') {
+              const days = Math.floor((new Date(r.toDate).getTime() - new Date(r.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              if (r.type === 'casual') usedCasual += days;
+              if (r.type === 'paid') usedPaid += days;
+              if (r.type === 'sick') usedSick += days;
+            }
+          });
+          setLeaveBalance({
+            casual: Math.max(0, quotas.casual - usedCasual),
+            paid: Math.max(0, quotas.paid - usedPaid),
+            sick: Math.max(0, quotas.sick - usedSick),
+            total: quotas.casual + quotas.paid + quotas.sick
+          });
+        });
+      };
+      fetchLeaveData();
+    }
+  }, [user]);
+
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
 
   const getLeaveForDate = (day: number) => {
-    return leaveData.find(leave => 
-      leave.date.getFullYear() === viewYear &&
-      leave.date.getMonth() === viewMonth &&
-      leave.date.getDate() === day
-    );
+    return leaveHistory.find((leave: any) => {
+      if (leave.status !== 'approved') return false;
+      const start = new Date(leave.fromDate);
+      const end = new Date(leave.toDate);
+      const checkDate = new Date(viewYear, viewMonth, day);
+      return checkDate >= start && checkDate <= end;
+    });
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -78,11 +113,11 @@ export function LeaveHome() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader 
+      <PageHeader
         title="Leave Management"
         description="Track and manage your leave balance"
       >
-        <Link to="/faculty/leave/apply">
+        <Link to="/faculty/apply-leave">
           <Button className="bg-primary hover:bg-primary/90">
             <FileText className="mr-2 h-4 w-4" />
             Apply Leave
@@ -123,7 +158,7 @@ export function LeaveHome() {
       </div>
 
       {/* Calendar View */}
-      <DataCard 
+      <DataCard
         title="Leave Calendar"
         action={
           <div className="flex items-center gap-4">
@@ -164,20 +199,20 @@ export function LeaveHome() {
                 {day}
               </div>
             ))}
-            
+
             {/* Empty cells for days before first day */}
             {Array.from({ length: firstDay }).map((_, i) => (
               <div key={`empty-${i}`} className="p-2" />
             ))}
-            
+
             {/* Day cells */}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
               const leave = getLeaveForDate(day);
-              const isToday = day === currentDate.getDate() && 
-                viewMonth === currentDate.getMonth() && 
+              const isToday = day === currentDate.getDate() &&
+                viewMonth === currentDate.getMonth() &&
                 viewYear === currentDate.getFullYear();
-              
+
               return (
                 <div
                   key={day}

@@ -29,6 +29,11 @@ interface CollegeSettings {
     departments: Department[];
     rooms: Room[];
     timings: TimingSlot[];
+    leaveQuotas: {
+        casual: number;
+        paid: number;
+        sick: number;
+    };
 }
 
 const DEFAULT_SETTINGS: CollegeSettings = {
@@ -46,7 +51,12 @@ const DEFAULT_SETTINGS: CollegeSettings = {
         { id: 't5', timeRange: '2:00 - 3:00' },
         { id: 't6', timeRange: '3:00 - 4:00' },
         { id: 't7', timeRange: '4:00 - 5:00' },
-    ]
+    ],
+    leaveQuotas: {
+        casual: 15,
+        paid: 12,
+        sick: 5
+    }
 };
 
 export function CollegeSettingsPage() {
@@ -73,7 +83,8 @@ export function CollegeSettingsPage() {
                     setSettings({
                         departments: data.departments || DEFAULT_SETTINGS.departments,
                         rooms: data.rooms || [],
-                        timings: data.timings || DEFAULT_SETTINGS.timings
+                        timings: data.timings || DEFAULT_SETTINGS.timings,
+                        leaveQuotas: data.leaveQuotas || DEFAULT_SETTINGS.leaveQuotas
                     });
                 }
             } catch (error) {
@@ -180,6 +191,59 @@ export function CollegeSettingsPage() {
             </PageHeader>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {/* Leave Quotas Configuration */}
+                <Card className="border-border">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <DoorOpen className="h-5 w-5" /> Base Leave Quotas
+                        </CardTitle>
+                        <CardDescription>Configure standard leave days for faculty.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="casualLeaves">Casual Leaves</Label>
+                                <Input
+                                    id="casualLeaves"
+                                    type="number"
+                                    min="0"
+                                    value={settings.leaveQuotas.casual}
+                                    onChange={(e) => {
+                                        setSettings(prev => ({ ...prev, leaveQuotas: { ...prev.leaveQuotas, casual: parseInt(e.target.value) || 0 } }));
+                                        setHasChanges(true);
+                                    }}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="paidLeaves">Paid Leaves</Label>
+                                <Input
+                                    id="paidLeaves"
+                                    type="number"
+                                    min="0"
+                                    value={settings.leaveQuotas.paid}
+                                    onChange={(e) => {
+                                        setSettings(prev => ({ ...prev, leaveQuotas: { ...prev.leaveQuotas, paid: parseInt(e.target.value) || 0 } }));
+                                        setHasChanges(true);
+                                    }}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="sickLeaves">Sick Leaves</Label>
+                                <Input
+                                    id="sickLeaves"
+                                    type="number"
+                                    min="0"
+                                    value={settings.leaveQuotas.sick}
+                                    onChange={(e) => {
+                                        setSettings(prev => ({ ...prev, leaveQuotas: { ...prev.leaveQuotas, sick: parseInt(e.target.value) || 0 } }));
+                                        setHasChanges(true);
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Timings Configuration */}
                 <Card className="border-border">
                     <CardHeader>
