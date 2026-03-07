@@ -6,6 +6,7 @@ export interface LeaveRequest {
   facultyName: string;
   facultyErpId: string;
   department: Department;
+  type: 'casual' | 'paid' | 'sick';
   reason: string;
   fromDate: string;
   toDate: string;
@@ -15,7 +16,7 @@ export interface LeaveRequest {
 
 export interface Notification {
   id: string;
-  toRole: 'admin' | 'faculty';
+  toRole: 'hod' | 'faculty';
   toDepartment: Department;
   toEmail?: string; // optional for faculty-specific
   message: string;

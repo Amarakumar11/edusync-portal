@@ -24,12 +24,18 @@ import AnnouncementsPage from "./pages/faculty/AnnouncementsPage";
 import EventsPage from "./pages/faculty/EventsPage";
 import { NotificationsPage } from "./pages/faculty/NotificationsPage";
 import ExamsPage from "./pages/faculty/ExamsPage";
-import ProfilePage from "./pages/faculty/ProfilePage";
+import ProfilePage from "./pages/shared/ProfilePage";
 
-// Admin Pages
+// HOD Pages
 import AdminHome from "./pages/admin/AdminHome";
+import AllTimetablesPage from "./pages/admin/AllTimetablesPage";
+import MyNotesPage from "./pages/admin/MyNotesPage";
+import { FacultyInfoPage } from "./pages/admin/FacultyInfoPage";
 import { LeaveRequestsPage } from "./pages/admin/LeaveRequestsPage";
 import { AdminNotificationsPage } from "./pages/admin/NotificationsPage";
+import OTPVerificationPage from "./pages/auth/OTPVerificationPage";
+import CollegeSettingsPage from "./pages/admin/CollegeSettingsPage";
+import ClassesManagerPage from "./pages/admin/ClassesManagerPage";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +51,7 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             <Route path="/login/:role" element={<LoginPage />} />
             <Route path="/signup/faculty" element={<SignupPage />} />
+            <Route path="/verify-otp" element={<OTPVerificationPage />} />
 
 
             {/* Faculty Routes */}
@@ -65,19 +72,42 @@ const App = () => (
               <Route path="profile" element={<ProfilePage />} />
             </Route>
 
-            {/* Admin Routes */}
-            <Route path="/admin" element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <DashboardLayout role="admin" />
+            {/* HOD Routes */}
+            <Route path="/hod" element={
+              <ProtectedRoute allowedRoles={['hod']}>
+                <DashboardLayout role="hod" />
               </ProtectedRoute>
             }>
               <Route index element={<AdminHome />} />
               <Route path="timetable" element={<TimetablePage />} />
+              <Route path="all-timetables" element={<AllTimetablesPage />} />
+              <Route path="notes" element={<MyNotesPage />} />
               <Route path="leave-requests" element={<LeaveRequestsPage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="events" element={<EventsPage />} />
               <Route path="notifications" element={<AdminNotificationsPage />} />
+              <Route path="faculty" element={<FacultyInfoPage />} />
+              <Route path="faculty/:uid/timetable" element={<TimetablePage />} />
               <Route path="exams" element={<ExamsPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+            </Route>
+
+            {/* Principal Routes */}
+            <Route path="/principal" element={
+              <ProtectedRoute allowedRoles={['principal']}>
+                <DashboardLayout role="principal" />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminHome />} />
+              <Route path="all-timetables" element={<AllTimetablesPage />} />
+              <Route path="faculty" element={<FacultyInfoPage />} />
+              <Route path="faculty/:uid/timetable" element={<TimetablePage />} />
+              <Route path="announcements" element={<AnnouncementsPage />} />
+              <Route path="events" element={<EventsPage />} />
+              <Route path="exams" element={<ExamsPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="settings" element={<CollegeSettingsPage />} />
+              <Route path="classes" element={<ClassesManagerPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

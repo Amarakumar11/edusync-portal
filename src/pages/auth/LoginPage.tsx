@@ -22,27 +22,29 @@ export function LoginPage() {
   const { login, isLoading: authLoading } = useAuth();
 
   const [formData, setFormData] = useState({
-    email: '',
+    identifier: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const isAdmin = role === 'admin';
+  const isHOD = role === 'hod';
+  const isPrincipal = role === 'principal';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.email || !formData.password) {
+    if (!formData.identifier || !formData.password) {
       setError('Please fill in all fields');
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await login(formData.email, formData.password);
+      const currentRole = isPrincipal ? 'principal' : isHOD ? 'hod' : 'faculty';
+      const result = await login(formData.identifier, formData.password, currentRole);
 
       if (!result.success) {
         setError(result.error || 'Login failed');
@@ -50,17 +52,7 @@ export function LoginPage() {
         return;
       }
 
-      // The AuthContext will have the user set now — let's check the role.
-      // The navigation will be handled by the auth state change,
-      // but we verify the role matches the page they're on.
-      // We need to re-read from auth context after successful login,
-      // but since state is asynchronous, we do a small delay or
-      // just navigate based on the role param.
-      if (isAdmin) {
-        navigate('/admin');
-      } else {
-        navigate('/faculty');
-      }
+      navigate(`/${currentRole}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       setIsLoading(false);
@@ -74,12 +66,14 @@ export function LoginPage() {
         <div className="max-w-md text-center">
           <Logo variant="light" size="lg" className="justify-center mb-8" />
           <h2 className="font-display text-3xl font-bold text-primary-foreground mb-4">
-            {isAdmin ? 'Admin Portal' : 'Faculty Portal'}
+            {isPrincipal ? 'Principal Portal' : isHOD ? 'HOD Portal' : 'Faculty Portal'}
           </h2>
           <p className="text-primary-foreground/70">
-            {isAdmin
-              ? 'Manage your institution with powerful administrative tools.'
-              : 'Access your schedule, apply for leave, and stay connected.'}
+            {isPrincipal
+              ? 'Oversee the entire institution with comprehensive oversight.'
+              : isHOD
+                ? 'Manage your institution with powerful administrative tools.'
+                : 'Access your schedule, apply for leave, and stay connected.'}
           </p>
         </div>
       </div>
@@ -105,7 +99,7 @@ export function LoginPage() {
           <Card className="border-0 shadow-lg">
             <CardHeader className="space-y-1">
               <CardTitle className="font-display text-2xl">
-                {isAdmin ? 'Admin Login' : 'Faculty Login'}
+                {isPrincipal ? 'Principal Login' : isHOD ? 'HOD Login' : 'Faculty Login'}
               </CardTitle>
               <CardDescription>
                 Enter your credentials to access your dashboard
@@ -121,13 +115,15 @@ export function LoginPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="identifier">
+                    {isPrincipal || isHOD ? 'Email' : 'ERP ID'}
+                  </Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    id="identifier"
+                    type={isPrincipal || isHOD ? 'email' : 'text'}
+                    placeholder={isPrincipal || isHOD ? 'Enter your email' : 'Enter your ERP ID (e.g. ERP001)'}
+                    value={formData.identifier}
+                    onChange={(e) => setFormData(prev => ({ ...prev, identifier: e.target.value }))}
                     className="input-focus"
                     disabled={isLoading || authLoading}
                   />
@@ -170,7 +166,7 @@ export function LoginPage() {
                   )}
                 </Button>
 
-                {!isAdmin && (
+                {!isHOD && !isPrincipal && (
                   <p className="text-center text-sm text-muted-foreground">
                     Don't have an account?{' '}
                     <Link

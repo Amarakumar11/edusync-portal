@@ -28,6 +28,7 @@ export async function createLeaveRequest(
   facultyName: string,
   facultyErpId: string,
   department: string,
+  type: 'casual' | 'paid' | 'sick',
   reason: string,
   fromDate: string,
   toDate: string
@@ -37,6 +38,7 @@ export async function createLeaveRequest(
     facultyName,
     facultyErpId,
     department,
+    type,
     reason,
     fromDate,
     toDate,
@@ -77,14 +79,14 @@ export async function getLeaveRequestsByDepartment(department: string): Promise<
   try {
     const q = query(
       collection(db, LEAVE_COLLECTION),
-      where('department', '==', department),
-      orderBy('createdAt', 'desc')
+      where('department', '==', department)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({
+    const results = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as LeaveRequest[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
     console.error('Error fetching leave requests by department:', error);
     return [];
@@ -98,14 +100,14 @@ export async function getLeaveRequestsByFaculty(email: string): Promise<LeaveReq
   try {
     const q = query(
       collection(db, LEAVE_COLLECTION),
-      where('facultyEmail', '==', email),
-      orderBy('createdAt', 'desc')
+      where('facultyEmail', '==', email)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({
+    const results = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as LeaveRequest[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
     console.error('Error fetching leave requests by faculty:', error);
     return [];
@@ -145,14 +147,14 @@ export function onLeaveRequestsByDepartment(
 ): Unsubscribe {
   const q = query(
     collection(db, LEAVE_COLLECTION),
-    where('department', '==', department),
-    orderBy('createdAt', 'desc')
+    where('department', '==', department)
   );
   return onSnapshot(q, (snap) => {
     const requests = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as LeaveRequest[];
+    requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     callback(requests);
   });
 }
@@ -166,14 +168,14 @@ export function onLeaveRequestsByFaculty(
 ): Unsubscribe {
   const q = query(
     collection(db, LEAVE_COLLECTION),
-    where('facultyEmail', '==', email),
-    orderBy('createdAt', 'desc')
+    where('facultyEmail', '==', email)
   );
   return onSnapshot(q, (snap) => {
     const requests = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
     })) as LeaveRequest[];
+    requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     callback(requests);
   });
 }

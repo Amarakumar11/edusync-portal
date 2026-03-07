@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/components/landing/Logo';
@@ -23,8 +23,11 @@ import {
   Users,
   StickyNote,
   Upload,
+  BookOpen,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 interface NavItemType {
   title: string;
@@ -43,28 +46,41 @@ const facultyNavItems: NavItemType[] = [
     icon: FileText,
     subItems: [
       { title: 'Overview', href: '/faculty/leave' },
-      { title: 'Apply', href: '/faculty/leave/apply' },
+      { title: 'Apply', href: '/faculty/apply-leave' },
     ]
   },
   { title: 'Leave History', href: '/faculty/leave-history', icon: History },
   { title: 'Announcements', href: '/faculty/announcements', icon: Megaphone },
   { title: 'Events', href: '/faculty/events', icon: CalendarDays },
-  { title: 'My Notifications', href: '/faculty/notifications', icon: Bell, badge: 3 },
+  { title: 'My Notifications', href: '/faculty/notifications', icon: Bell },
   { title: 'Examination Info', href: '/faculty/exams', icon: GraduationCap },
   { title: 'Profile', href: '/faculty/profile', icon: User },
 ];
 
-const adminNavItems: NavItemType[] = [
-  { title: 'Home', href: '/admin', icon: Home },
-  { title: 'My Timetable', href: '/admin/timetable', icon: Calendar },
-  { title: 'All Timetables', href: '/admin/all-timetables', icon: Upload },
-  { title: 'My Notes', href: '/admin/notes', icon: StickyNote },
-  { title: 'Leave Requests', href: '/admin/leave-requests', icon: ClipboardList, badge: 5 },
-  { title: 'Announcements', href: '/admin/announcements', icon: Megaphone },
-  { title: 'Events', href: '/admin/events', icon: CalendarDays },
-  { title: 'My Notifications', href: '/admin/notifications', icon: Bell, badge: 2 },
-  { title: 'Faculty Info', href: '/admin/faculty', icon: Users },
-  { title: 'Examination Info', href: '/admin/exams', icon: GraduationCap },
+const hodNavItems: NavItemType[] = [
+  { title: 'Home', href: '/hod', icon: Home },
+  { title: 'My Timetable', href: '/hod/timetable', icon: Calendar },
+  { title: 'All Timetables', href: '/hod/all-timetables', icon: Upload },
+  { title: 'My Notes', href: '/hod/notes', icon: StickyNote },
+  { title: 'Leave Requests', href: '/hod/leave-requests', icon: ClipboardList },
+  { title: 'Announcements', href: '/hod/announcements', icon: Megaphone },
+  { title: 'Events', href: '/hod/events', icon: CalendarDays },
+  { title: 'My Notifications', href: '/hod/notifications', icon: Bell },
+  { title: 'Faculty Info', href: '/hod/faculty', icon: Users },
+  { title: 'Examination Info', href: '/hod/exams', icon: GraduationCap },
+  { title: 'Profile', href: '/hod/profile', icon: User },
+];
+
+const principalNavItems: NavItemType[] = [
+  { title: 'Home', href: '/principal', icon: Home },
+  { title: 'All Timetables', href: '/principal/all-timetables', icon: Calendar },
+  { title: 'Faculty & HODs Info', href: '/principal/faculty', icon: Users },
+  { title: 'Announcements', href: '/principal/announcements', icon: Megaphone },
+  { title: 'Events', href: '/principal/events', icon: CalendarDays },
+  { title: 'Examination Info', href: '/principal/exams', icon: GraduationCap },
+  { title: 'Profile', href: '/principal/profile', icon: User },
+  { title: 'Classes', href: '/principal/classes', icon: BookOpen },
+  { title: 'Settings', href: '/principal/settings', icon: Menu },
 ];
 
 interface DashboardSidebarProps {
@@ -76,8 +92,47 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const { logout, user } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [pendingLeaves, setPendingLeaves] = useState(0);
 
-  const navItems = role === 'admin' ? adminNavItems : facultyNavItems;
+  useEffect(() => {
+    if (!user) return;
+
+    let unsubNotifs = () => { };
+    let unsubLeaves = () => { };
+
+    // 1. Unread Notifications
+    const notifsQuery = user.role === 'hod'
+      ? query(collection(db, 'notifications'), where('toRole', '==', 'hod'), where('toDepartment', '==', user.department))
+      : query(collection(db, 'notifications'), where('toRole', '==', 'faculty'), where('toEmail', '==', user.email));
+
+    unsubNotifs = onSnapshot(notifsQuery, (snap) => {
+      let unread = 0;
+      snap.forEach(doc => {
+        if (!doc.data().read) unread++;
+      });
+      setUnreadNotifications(unread);
+    });
+
+    // 2. Pending Leave Requests (HOD only)
+    if (user.role === 'hod') {
+      const leavesQuery = query(collection(db, 'leaveRequests'), where('department', '==', user.department));
+      unsubLeaves = onSnapshot(leavesQuery, (snap) => {
+        let pending = 0;
+        snap.forEach(doc => {
+          if (doc.data().status === 'pending') pending++;
+        });
+        setPendingLeaves(pending);
+      });
+    }
+
+    return () => {
+      unsubNotifs();
+      unsubLeaves();
+    };
+  }, [user]);
+
+  const navItems = role === 'principal' ? principalNavItems : (role === 'hod' ? hodNavItems : facultyNavItems);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev =>
@@ -94,6 +149,12 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
     return location.pathname.startsWith(href);
   };
 
+  const getBadgeCount = (title: string, staticBadge?: number) => {
+    if (title === 'My Notifications' && unreadNotifications > 0) return unreadNotifications;
+    if (title === 'Leave Requests' && pendingLeaves > 0) return pendingLeaves;
+    return staticBadge;
+  };
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
@@ -104,8 +165,12 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
       {/* User Info */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-semibold">
-            {user?.name?.charAt(0) || 'U'}
+          <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-semibold overflow-hidden">
+            {user?.profileImage ? (
+              <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              user?.name?.charAt(0) || 'U'
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
@@ -173,9 +238,9 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
                 >
                   <item.icon className="h-5 w-5" />
                   <span className="flex-1">{item.title}</span>
-                  {item.badge && (
+                  {getBadgeCount(item.title, item.badge) !== undefined && (
                     <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-medium rounded-full bg-sidebar-primary text-sidebar-primary-foreground">
-                      {item.badge}
+                      {getBadgeCount(item.title, item.badge)}
                     </span>
                   )}
                 </NavLink>

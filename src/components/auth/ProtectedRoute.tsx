@@ -5,7 +5,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles?: ('admin' | 'faculty')[];
+  allowedRoles?: ('hod' | 'faculty' | 'principal')[];
 }
 
 /**
@@ -29,17 +29,18 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    const redirectPath = user.role === 'admin' ? '/admin' : '/faculty';
+    let redirectPath = '/faculty';
+    if (user.role === 'hod') redirectPath = '/hod';
+    else if (user.role === 'principal') redirectPath = '/principal';
     return <Navigate to={redirectPath} replace />;
   }
 
   return <>{children}</>;
 }
 
-/**
- * AdminRoute: Checks if user is an admin.
- */
-export function AdminRoute({ children }: { children: ReactNode }) {
+//  * HODRoute: Checks if user is a HOD.
+//  */
+export function HODRoute({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -51,9 +52,9 @@ export function AdminRoute({ children }: { children: ReactNode }) {
   }
 
   if (!isAuthenticated || !user) {
-    return <Navigate to="/login/admin" replace />;
+    return <Navigate to="/login/hod" replace />;
   }
-  if (user.role !== 'admin') {
+  if (user.role !== 'hod') {
     return <Navigate to="/faculty" replace />;
   }
   return <>{children}</>;
@@ -77,7 +78,7 @@ export function FacultyRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/login/faculty" replace />;
   }
   if (user.role !== 'faculty') {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to="/hod" replace />;
   }
   return <>{children}</>;
 }
