@@ -22,7 +22,7 @@ import { LeaveRequest, LeaveSwap } from '@/types/leave';
 import { format, parseISO } from 'date-fns';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { Clock4, CheckCircle2, ShieldAlert, Send, ArrowRight, BookOpen, Users, Loader2 } from 'lucide-react';
+import { Clock4, CheckCircle2, ShieldAlert, Send, ArrowRight, BookOpen, Users, Loader2, Palmtree } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -39,7 +39,7 @@ export function ApplyLeavePage() {
   const [swaps, setSwaps] = useState<LeaveSwap[]>([]);
 
   const [formData, setFormData] = useState({
-    type: 'casual' as 'casual' | 'paid' | 'sick',
+    type: 'casual' as LeaveRequest['type'],
     fromDate: '',
     fromTime: '',
     toDate: '',
@@ -51,19 +51,32 @@ export function ApplyLeavePage() {
   const [timings, setTimings] = useState<any[]>([]);
   const quickDurations = ['0.5', '1', '1.5', '2', '3'];
 
-  // Calculate balances
-  const [balances, setBalances] = useState({ casual: 15, paid: 12, sick: 5 });
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [balances, setBalances] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (user?.email) {
       const fetchLeaveData = async () => {
-        let quotas = { casual: 15, paid: 12, sick: 5 };
+        let quotas: any[] = [];
         try {
           const docRef = doc(db, 'settings', 'college');
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.leaveQuotas) quotas = data.leaveQuotas;
+            if (data.leaveQuotas) {
+              const rawQuotas = data.leaveQuotas;
+              if (Array.isArray(rawQuotas)) {
+                quotas = rawQuotas;
+              } else if (typeof rawQuotas === 'object') {
+                // Convert legacy object format to new array format
+                quotas = Object.entries(rawQuotas).map(([key, val]) => ({
+                  id: key,
+                  label: key.charAt(0).toUpperCase() + key.slice(1).replace('-', ' ') + ' Leave',
+                  days: Number(val)
+                }));
+              }
+              setLeaveTypes(quotas);
+            }
             if (data.timings) {
               // Sort timings by start time
               const sortedTimings = [...data.timings].sort((a, b) => {
@@ -87,20 +100,26 @@ export function ApplyLeavePage() {
 
         getLeaveRequestsByFaculty(user.email).then(reqs => {
           setLeaveHistory(reqs);
-          let usedCasual = 0, usedPaid = 0, usedSick = 0;
+          const used: Record<string, number> = {};
+
           reqs.forEach(r => {
             if (r.status === 'approved') {
               const days = r.durationInDays || 1;
-              if (r.type === 'casual') usedCasual += days;
-              if (r.type === 'paid') usedPaid += days;
-              if (r.type === 'sick') usedSick += days;
+              used[r.type] = (used[r.type] || 0) + days;
             }
           });
-          setBalances({
-            casual: Math.max(0, quotas.casual - usedCasual),
-            paid: Math.max(0, quotas.paid - usedPaid),
-            sick: Math.max(0, quotas.sick - usedSick)
+
+          const newBalances: Record<string, number> = {};
+          quotas.forEach((q: any) => {
+            if (q.days > 0) {
+              newBalances[q.id] = Math.max(0, q.days - (used[q.id] || 0));
+            } else {
+              // For leaves with 0 quota (unlimited/untracked), just show used
+              newBalances[q.id] = used[q.id] || 0;
+            }
           });
+
+          setBalances(newBalances);
           setFetchingHistory(false);
         });
       };
@@ -207,13 +226,83 @@ export function ApplyLeavePage() {
 
   if (!user || user.role !== 'faculty') return null;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const setFormatDuration = (val: string) => {
+    setFormData(prev => {
+      const newDuration = parseFloat(val);
+      let newToDate = prev.toDate;
+
+      if (prev.fromDate && !isNaN(newDuration)) {
+        const start = new Date(prev.fromDate);
+        const end = new Date(start);
+        // If duration is 0.5 or 1, same date (usually)
+        // If duration is 2, it's from 1st to 2nd. so + (duration - 1)
+        const daysToAdd = Math.max(0, Math.ceil(newDuration) - 1);
+        end.setDate(start.getDate() + daysToAdd);
+        newToDate = end.toISOString().split('T')[0];
+      }
+
+      return { ...prev, durationInDays: val, toDate: newToDate };
+    });
   };
 
-  const setFormatDuration = (val: string) => {
-    setFormData(prev => ({ ...prev, durationInDays: val }));
+  const calculateDuration = (from: string, to: string) => {
+    if (!from || !to) return;
+    const start = new Date(from);
+    const end = new Date(to);
+    if (end < start) return;
+
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    setFormData(prev => ({ ...prev, durationInDays: diffDays.toString() }));
+  };
+
+  const handleDateChange = (name: string, value: string) => {
+    setFormData(prev => {
+      const newData = { ...prev, [name]: value };
+
+      // Auto-calculate logic
+      if (name === 'fromDate') {
+        if (prev.durationInDays && !newData.toDate) {
+          // Update toDate based on duration if toDate is empty
+          const start = new Date(value);
+          const end = new Date(start);
+          const daysToAdd = Math.max(0, Math.ceil(parseFloat(prev.durationInDays)) - 1);
+          end.setDate(start.getDate() + daysToAdd);
+          newData.toDate = end.toISOString().split('T')[0];
+        } else if (newData.toDate) {
+          // Recalculate duration
+          const start = new Date(value);
+          const end = new Date(newData.toDate);
+          if (end >= start) {
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            newData.durationInDays = (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1).toString();
+          }
+        }
+      } else if (name === 'toDate') {
+        if (newData.fromDate) {
+          const start = new Date(newData.fromDate);
+          const end = new Date(value);
+          if (end >= start) {
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            newData.durationInDays = (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1).toString();
+          }
+        }
+      } else if (name === 'durationInDays') {
+        if (newData.fromDate) {
+          const duration = parseFloat(value);
+          if (!isNaN(duration) && duration > 0) {
+            const start = new Date(newData.fromDate);
+            const end = new Date(start);
+            const daysToAdd = Math.max(0, Math.ceil(duration) - 1);
+            end.setDate(start.getDate() + daysToAdd);
+            newData.toDate = end.toISOString().split('T')[0];
+          }
+        }
+      }
+
+      return newData;
+    });
   };
 
   const handleSwapAssign = (swapId: string, facultyEmail: string) => {
@@ -314,39 +403,41 @@ export function ApplyLeavePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-gradient-to-br from-red-500 to-rose-600 border-0 shadow-lg shadow-red-500/20 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-20"><ShieldAlert className="w-24 h-24" /></div>
-          <CardHeader className="relative z-10 pb-2">
-            <CardTitle className="text-red-100 font-medium text-lg">Casual Leave</CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-5xl font-bold">{fetchingHistory ? '-' : balances.casual}</div>
-            <p className="text-red-200 mt-1 text-sm">Days Available</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {leaveTypes.slice(0, 3).map((type, idx) => {
+          const colors = [
+            'from-emerald-500 to-teal-600 shadow-emerald-500/20',
+            'from-blue-500 to-cyan-600 shadow-blue-500/20',
+            'from-purple-500 to-indigo-600 shadow-purple-500/20',
+            'from-amber-400 to-orange-500 shadow-amber-500/20',
+            'from-rose-500 to-red-600 shadow-red-500/20',
+          ];
+          const colorClass = colors[idx % colors.length];
+          const typeBalance = balances[type.id] ?? 0;
+          const isUnlimited = type.days === 0;
 
-        <Card className="bg-gradient-to-br from-amber-400 to-orange-500 border-0 shadow-lg shadow-amber-500/20 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-20"><Clock4 className="w-24 h-24" /></div>
-          <CardHeader className="relative z-10 pb-2">
-            <CardTitle className="text-amber-100 font-medium text-lg">Paid Leave</CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-5xl font-bold">{fetchingHistory ? '-' : balances.paid}</div>
-            <p className="text-amber-200 mt-1 text-sm">Days Available</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-blue-500 to-cyan-600 border-0 shadow-lg shadow-blue-500/20 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-20"><CheckCircle2 className="w-24 h-24" /></div>
-          <CardHeader className="relative z-10 pb-2">
-            <CardTitle className="text-blue-100 font-medium text-lg">Sick Leave</CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-5xl font-bold">{fetchingHistory ? '-' : balances.sick}</div>
-            <p className="text-blue-200 mt-1 text-sm">Days Available</p>
-          </CardContent>
-        </Card>
+          return (
+            <Card key={type.id} className={cn("border-0 shadow-lg text-white overflow-hidden relative bg-gradient-to-br", colorClass)}>
+              <div className="absolute top-0 right-0 p-4 opacity-20">
+                {type.id === 'casual' ? <Palmtree className="w-16 h-16" /> : <Clock4 className="w-16 h-16" />}
+              </div>
+              <CardHeader className="relative z-10 pb-1">
+                <CardTitle className="text-white/90 font-medium text-sm">{type.label}</CardTitle>
+              </CardHeader>
+              <CardContent className="relative z-10 pt-0">
+                <div className="text-3xl font-bold">{fetchingHistory ? '-' : typeBalance}</div>
+                <p className="text-white/70 text-[10px] mt-1 uppercase tracking-wider font-bold">
+                  {isUnlimited ? 'Days Taken' : 'Days Left'}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
+        {leaveTypes.length === 0 && !fetchingHistory && (
+          <div className="col-span-full py-8 text-center text-muted-foreground italic">
+            No leave quotas configured in settings.
+          </div>
+        )}
       </div>
 
       <form id="leave-form" onSubmit={handleSubmit} className="space-y-8">
@@ -370,9 +461,9 @@ export function ApplyLeavePage() {
                       <SelectValue placeholder="Select leave type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="casual">Casual Leave</SelectItem>
-                      <SelectItem value="paid">Paid Leave</SelectItem>
-                      <SelectItem value="sick">Sick Leave</SelectItem>
+                      {leaveTypes.map(type => (
+                        <SelectItem key={type.id} value={type.id}>{type.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -397,7 +488,9 @@ export function ApplyLeavePage() {
                       id="durationInDays" name="durationInDays" type="number" step="0.5" min="0.5" max="365"
                       placeholder="e.g. 3.5"
                       className="pl-4 h-12 text-lg font-medium border-primary/20 bg-muted/30 transition-all focus-visible:ring-primary/40 focus-visible:ring-offset-0"
-                      value={formData.durationInDays} onChange={handleChange} required
+                      value={formData.durationInDays}
+                      onChange={(e) => handleDateChange('durationInDays', e.target.value)}
+                      required
                     />
                   </div>
                 </div>
@@ -408,7 +501,9 @@ export function ApplyLeavePage() {
                     <Input
                       id="fromDate" name="fromDate" type="date"
                       className="h-12 border-primary/20 bg-muted/30 focus-visible:ring-primary/40"
-                      value={formData.fromDate} onChange={handleChange} required
+                      value={formData.fromDate}
+                      onChange={(e) => handleDateChange('fromDate', e.target.value)}
+                      required
                     />
                   </div>
                   <div className="space-y-3">
@@ -435,7 +530,9 @@ export function ApplyLeavePage() {
                     <Input
                       id="toDate" name="toDate" type="date"
                       className="h-12 border-primary/20 bg-muted/30 focus-visible:ring-primary/40"
-                      value={formData.toDate} onChange={handleChange} required
+                      value={formData.toDate}
+                      onChange={(e) => handleDateChange('toDate', e.target.value)}
+                      required
                     />
                   </div>
                   <div className="space-y-3">
@@ -470,7 +567,9 @@ export function ApplyLeavePage() {
                 <Textarea
                   id="reason" name="reason" placeholder="I am applying for leave because..."
                   className="flex-1 min-h-[220px] resize-none border-primary/20 bg-muted/30 p-4 text-base focus-visible:ring-primary/40 focus-visible:ring-offset-0 transition-all"
-                  value={formData.reason} onChange={handleChange} required
+                  value={formData.reason}
+                  onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
+                  required
                 />
               </CardContent>
             </Card>

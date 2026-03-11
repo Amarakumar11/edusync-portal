@@ -50,7 +50,8 @@ export function LeaveHome() {
   const [viewMonth, setViewMonth] = useState(currentDate.getMonth());
   const [viewYear, setViewYear] = useState(currentDate.getFullYear());
 
-  const [leaveBalance, setLeaveBalance] = useState({ casual: 0, paid: 0, sick: 0, total: 0 });
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState<Record<string, number>>({});
   const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
   const [pendingSwaps, setPendingSwaps] = useState<{ leave: any, swap: any }[]>([]);
   const [acceptedSwaps, setAcceptedSwaps] = useState<{ leave: any, swap: any }[]>([]);
@@ -92,12 +93,29 @@ export function LeaveHome() {
   useEffect(() => {
     if (user?.email) {
       const fetchLeaveData = async () => {
-        let quotas = { casual: 15, paid: 12, sick: 5 };
+        let quotas: any[] = [
+          { id: 'casual', label: 'Casual Leave', days: 12 },
+          { id: 'paid', label: 'Paid Leave', days: 12 },
+          { id: 'sick', label: 'Sick Leave', days: 5 }
+        ];
         try {
           const docRef = doc(db, 'settings', 'college');
           const docSnap = await getDoc(docRef);
-          if (docSnap.exists() && docSnap.data().leaveQuotas) {
-            quotas = docSnap.data().leaveQuotas;
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.leaveQuotas) {
+              const rawQuotas = data.leaveQuotas;
+              if (Array.isArray(rawQuotas)) {
+                quotas = rawQuotas;
+              } else if (typeof rawQuotas === 'object') {
+                quotas = Object.entries(rawQuotas).map(([key, val]) => ({
+                  id: key,
+                  label: key.charAt(0).toUpperCase() + key.slice(1).replace('-', ' ') + ' Leave',
+                  days: Number(val)
+                }));
+              }
+              setLeaveTypes(quotas);
+            }
           }
         } catch (error) {
           console.error("Error fetching leave quotas", error);
@@ -105,21 +123,25 @@ export function LeaveHome() {
 
         getLeaveRequestsByFaculty(user.email).then(reqs => {
           setLeaveHistory(reqs);
-          let usedCasual = 0, usedPaid = 0, usedSick = 0;
+          const used: Record<string, number> = {};
+
           reqs.forEach(r => {
             if (r.status === 'approved') {
               const days = Math.floor((new Date(r.toDate).getTime() - new Date(r.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-              if (r.type === 'casual') usedCasual += days;
-              if (r.type === 'paid') usedPaid += days;
-              if (r.type === 'sick') usedSick += days;
+              used[r.type] = (used[r.type] || 0) + days;
             }
           });
-          setLeaveBalance({
-            casual: Math.max(0, quotas.casual - usedCasual),
-            paid: Math.max(0, quotas.paid - usedPaid),
-            sick: Math.max(0, quotas.sick - usedSick),
-            total: quotas.casual + quotas.paid + quotas.sick
+
+          const newBalances: Record<string, number> = {};
+          quotas.forEach((q: any) => {
+            if (q.days > 0) {
+              newBalances[q.id] = Math.max(0, q.days - (used[q.id] || 0));
+            } else {
+              newBalances[q.id] = used[q.id] || 0;
+            }
           });
+
+          setLeaveBalance(newBalances);
         });
       };
       fetchLeaveData();
@@ -193,35 +215,25 @@ export function LeaveHome() {
       </PageHeader>
 
       {/* Leave Balance Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-        <StatsCard
-          title="Total Leaves"
-          value={leaveBalance.total}
-          description="Available this year"
-          icon={Calendar}
-          variant="primary"
-        />
-        <StatsCard
-          title="Casual Leave"
-          value={leaveBalance.casual}
-          description="Days remaining"
-          icon={CheckCircle2}
-          variant="success"
-        />
-        <StatsCard
-          title="Paid Leave"
-          value={leaveBalance.paid}
-          description="Days remaining"
-          icon={Clock}
-          variant="warning"
-        />
-        <StatsCard
-          title="Sick Leave"
-          value={leaveBalance.sick}
-          description="Days remaining"
-          icon={XCircle}
-          variant="info"
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+        {leaveTypes.slice(0, 3).map((type, idx) => {
+          const variants = ['success', 'info', 'primary', 'warning', 'info'] as const;
+          const icons = [CheckCircle2, XCircle, FileText, Calendar, Clock];
+
+          return (
+            <StatsCard
+              key={type.id}
+              title={type.label}
+              value={leaveBalance[type.id] ?? 0}
+              description={type.days > 0 ? "Days remaining" : "Days taken"}
+              icon={icons[idx % icons.length]}
+              variant={variants[idx % variants.length]}
+            />
+          );
+        })}
+        {leaveTypes.length === 0 && (
+          <p className="col-span-full text-center text-muted-foreground py-4 italic">No stats available.</p>
+        )}
       </div>
 
       {/* Swap Management Sections */}
@@ -272,12 +284,13 @@ export function LeaveHome() {
                   <div key={swap.id} className="p-4 border rounded-xl bg-green-50/30 border-green-200/50">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <Badge className="bg-green-100 text-green-800 border-green-200">
-                            {swap.date}
-                          </Badge>
+                        <div className="flex items-center gap-1 text-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>{swap.acceptedByName}</span>
                         </div>
+                        <Badge className="bg-green-100 text-green-800 border-green-200">
+                          {swap.date}
+                        </Badge>
                         <h4 className="font-bold text-lg">{swap.subject}</h4>
                         <p className="text-sm text-muted-foreground italic">Covering for {leave.facultyName}</p>
                       </div>

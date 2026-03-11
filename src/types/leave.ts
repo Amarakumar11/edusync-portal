@@ -21,7 +21,7 @@ export interface LeaveRequest {
   facultyName: string;
   facultyErpId: string;
   department: Department | string;
-  type: 'casual' | 'paid' | 'sick';
+  type: string;
   reason: string;
   fromDate: string;
   toDate: string;
