@@ -37,34 +37,50 @@ export function FacultyHome() {
     const fetchDashboardData = async () => {
       try {
         // 1. Leave Balances & Pending Requests
-        let quotas = { casual: 15, paid: 12, sick: 5 };
+        let quotas: any[] = [
+          { id: 'casual', label: 'Casual Leave', days: 12 },
+          { id: 'sick', label: 'Sick Leave', days: 5 }
+        ];
         const docRef = doc(db, 'settings', 'college');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists() && docSnap.data().leaveQuotas) {
-          quotas = docSnap.data().leaveQuotas;
+          const rawQuotas = docSnap.data().leaveQuotas;
+          if (Array.isArray(rawQuotas)) {
+            quotas = rawQuotas;
+          } else if (typeof rawQuotas === 'object') {
+            quotas = Object.entries(rawQuotas).map(([key, val]) => ({
+              id: key,
+              label: key.charAt(0).toUpperCase() + key.slice(1).replace('-', ' ') + ' Leave',
+              days: Number(val)
+            }));
+          }
         }
 
         const leaves = await getLeaveRequestsByFaculty(user.email);
         let used = 0;
-        let casual = quotas.casual, paid = quotas.paid, sick = quotas.sick;
+        const usedByType: Record<string, number> = {};
         let pending = 0;
 
         leaves.forEach(r => {
-          if (r.status === 'pending') {
+          if (r.status === 'pending_hod' || r.status === 'pending_principal' || r.status === 'swaps_pending') {
             pending++;
           } else if (r.status === 'approved') {
-            const days = Math.floor((new Date(r.toDate).getTime() - new Date(r.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            const days = r.durationInDays || (Math.floor((new Date(r.toDate).getTime() - new Date(r.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1);
             used += days;
-            if (r.type === 'casual') casual -= days;
-            if (r.type === 'paid') paid -= days;
-            if (r.type === 'sick') sick -= days;
+            usedByType[r.type] = (usedByType[r.type] || 0) + days;
           }
         });
+
+        const casualQuota = quotas.find(q => q.id === 'casual')?.days || 0;
+        const paidQuota = quotas.find(q => q.id === 'paid' || q.id === 'earned')?.days || 0;
+        const sickQuota = quotas.find(q => q.id === 'sick')?.days || 0;
+        const totalQuota = quotas.reduce((acc, q) => acc + (q.days > 0 ? q.days : 0), 0);
+
         setLeaveBalance({
-          casual: Math.max(0, casual),
-          paid: Math.max(0, paid),
-          sick: Math.max(0, sick),
-          total: quotas.casual + quotas.paid + quotas.sick,
+          casual: Math.max(0, casualQuota - (usedByType['casual'] || 0)),
+          paid: Math.max(0, paidQuota - (usedByType['paid'] || usedByType['earned'] || 0)),
+          sick: Math.max(0, sickQuota - (usedByType['sick'] || 0)),
+          total: totalQuota,
           used
         });
         setPendingRequestsCount(pending);
