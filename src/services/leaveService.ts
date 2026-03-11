@@ -28,11 +28,17 @@ export async function createLeaveRequest(
   facultyName: string,
   facultyErpId: string,
   department: string,
-  type: 'casual' | 'paid' | 'sick',
+  type: string,
   reason: string,
   fromDate: string,
-  toDate: string
+  toDate: string,
+  durationInDays: number,
+  swaps: any[],
+  fromTime?: string,
+  toTime?: string
 ): Promise<LeaveRequest> {
+  const initialStatus = swaps.length > 0 ? 'swaps_pending' : 'pending_hod';
+
   const leaveData = {
     facultyEmail,
     facultyName,
@@ -42,7 +48,11 @@ export async function createLeaveRequest(
     reason,
     fromDate,
     toDate,
-    status: 'pending' as const,
+    fromTime,
+    toTime,
+    durationInDays,
+    swaps,
+    status: initialStatus as 'swaps_pending' | 'pending_hod',
     createdAt: new Date().toISOString(),
   };
 
@@ -114,15 +124,121 @@ export async function getLeaveRequestsByFaculty(email: string): Promise<LeaveReq
   }
 }
 
-/**
- * Update leave request status (approve/reject)
- */
 export async function updateLeaveRequestStatus(
   leaveId: string,
-  status: 'approved' | 'rejected'
+  status: 'swaps_pending' | 'pending_hod' | 'pending_principal' | 'approved' | 'rejected' | 'cancelled'
 ): Promise<void> {
   const docRef = doc(db, LEAVE_COLLECTION, leaveId);
-  await updateDoc(docRef, { status });
+  const snap = await getDocs(query(collection(db, LEAVE_COLLECTION), where('__name__', '==', leaveId)));
+  if (snap.empty) return;
+
+  const leaveData = snap.docs[0].data() as LeaveRequest;
+
+  // If cancelled or rejected, also cancel all swaps
+  if (status === 'cancelled' || status === 'rejected') {
+    const updatedSwaps = leaveData.swaps?.map((s: any) => ({ ...s, status: 'cancelled' })) || [];
+    await updateDoc(docRef, { status, swaps: updatedSwaps });
+  } else {
+    await updateDoc(docRef, { status });
+  }
+}
+
+/**
+ * Get leave requests by status (for Principal/Admin)
+ */
+export async function getLeaveRequestsByStatus(status: string): Promise<LeaveRequest[]> {
+  try {
+    const q = query(
+      collection(db, LEAVE_COLLECTION),
+      where('status', '==', status)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+  } catch (error) {
+    console.error('Error fetching leave requests by status:', error);
+    return [];
+  }
+}
+
+/**
+ * Accept a swap request within a leave request
+ */
+export async function acceptLeaveSwap(
+  leaveId: string,
+  swapId: string,
+  acceptorEmail: string,
+  acceptorName: string,
+  currentSwaps: any[],
+  leaveRequest: LeaveRequest
+): Promise<void> {
+  const updatedSwaps = currentSwaps.map(swap => {
+    if (swap.id === swapId) {
+      return {
+        ...swap,
+        status: 'accepted',
+        acceptedByEmail: acceptorEmail,
+        acceptedByName: acceptorName
+      };
+    }
+    return swap;
+  });
+
+  // Check if all swaps are now accepted
+  const allAccepted = updatedSwaps.every(s => s.status === 'accepted');
+  const updates: any = { swaps: updatedSwaps };
+
+  if (allAccepted) {
+    updates.status = 'pending_hod';
+  }
+
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  await updateDoc(docRef, updates);
+
+  // Notifications
+  await import('./notificationService').then(async ({ createNotification }) => {
+    // Notify requester
+    await createNotification(
+      'faculty',
+      leaveRequest.department,
+      `${acceptorName} accepted your swap request for ${updatedSwaps.find(s => s.id === swapId)?.subject}`,
+      leaveRequest.facultyEmail
+    );
+
+    if (allAccepted) {
+      // Notify HOD
+      await createNotification(
+        'hod',
+        leaveRequest.department,
+        `All swaps accepted for ${leaveRequest.facultyName}'s leave. Waiting for your approval.`,
+        undefined
+      );
+    }
+  });
+}
+
+/**
+ * Cancel a swap request (if the requested faculty rejects it)
+ */
+export async function rejectLeaveSwap(
+  leaveId: string,
+  swapId: string,
+  currentSwaps: any[]
+): Promise<void> {
+  const updatedSwaps = currentSwaps.map(swap => {
+    if (swap.id === swapId) {
+      return {
+        ...swap,
+        status: 'rejected',
+      };
+    }
+    return swap;
+  });
+
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  await updateDoc(docRef, { swaps: updatedSwaps });
 }
 
 /**

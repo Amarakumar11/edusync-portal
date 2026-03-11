@@ -25,15 +25,17 @@ interface TimingSlot {
     timeRange: string; // e.g., '9:00 - 10:00'
 }
 
+interface LeaveQuota {
+    id: string;   // e.g., 'casual'
+    label: string; // e.g., 'Casual Leave'
+    days: number;
+}
+
 interface CollegeSettings {
     departments: Department[];
     rooms: Room[];
     timings: TimingSlot[];
-    leaveQuotas: {
-        casual: number;
-        paid: number;
-        sick: number;
-    };
+    leaveQuotas: LeaveQuota[];
 }
 
 const DEFAULT_SETTINGS: CollegeSettings = {
@@ -52,11 +54,14 @@ const DEFAULT_SETTINGS: CollegeSettings = {
         { id: 't6', timeRange: '3:00 - 4:00' },
         { id: 't7', timeRange: '4:00 - 5:00' },
     ],
-    leaveQuotas: {
-        casual: 15,
-        paid: 12,
-        sick: 5
-    }
+    leaveQuotas: [
+        { id: 'casual', label: 'Casual Leave', days: 12 },
+        { id: 'vacation', label: 'Vacation Leave', days: 28 },
+        { id: 'medical', label: 'Medical Leave', days: 15 },
+        { id: 'on-duty', label: 'On-Duty', days: 0 },
+        { id: 'sick', label: 'Sick Leave', days: 5 },
+        { id: 'paid', label: 'Paid Leave', days: 12 }
+    ]
 };
 
 export function CollegeSettingsPage() {
@@ -72,6 +77,8 @@ export function CollegeSettingsPage() {
     const [newRoomId, setNewRoomId] = useState('');
     const [newRoomDeptId, setNewRoomDeptId] = useState('');
     const [newTimingRange, setNewTimingRange] = useState('');
+    const [newLeaveLabel, setNewLeaveLabel] = useState('');
+    const [newLeaveDays, setNewLeaveDays] = useState('0');
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -80,11 +87,22 @@ export function CollegeSettingsPage() {
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
+                    let finalLeaveQuotas = data.leaveQuotas || DEFAULT_SETTINGS.leaveQuotas;
+
+                    // Handle transition from object to array
+                    if (finalLeaveQuotas && !Array.isArray(finalLeaveQuotas) && typeof finalLeaveQuotas === 'object') {
+                        finalLeaveQuotas = Object.entries(finalLeaveQuotas).map(([key, val]) => ({
+                            id: key,
+                            label: key.charAt(0).toUpperCase() + key.slice(1).replace('-', ' ') + ' Leave',
+                            days: Number(val)
+                        }));
+                    }
+
                     setSettings({
                         departments: data.departments || DEFAULT_SETTINGS.departments,
                         rooms: data.rooms || [],
                         timings: data.timings || DEFAULT_SETTINGS.timings,
-                        leaveQuotas: data.leaveQuotas || DEFAULT_SETTINGS.leaveQuotas
+                        leaveQuotas: finalLeaveQuotas
                     });
                 }
             } catch (error) {
@@ -175,6 +193,36 @@ export function CollegeSettingsPage() {
         setHasChanges(true);
     };
 
+    // Leave Quotas
+    const addLeaveQuota = () => {
+        if (!newLeaveLabel) return;
+        const id = newLeaveLabel.toLowerCase().replace(/\s+/g, '-');
+        if (settings.leaveQuotas.find(q => q.id === id)) {
+            toast.error('Leave type already exists');
+            return;
+        }
+        setSettings(prev => ({
+            ...prev,
+            leaveQuotas: [...prev.leaveQuotas, { id, label: newLeaveLabel, days: parseInt(newLeaveDays) || 0 }]
+        }));
+        setNewLeaveLabel('');
+        setNewLeaveDays('0');
+        setHasChanges(true);
+    };
+
+    const removeLeaveQuota = (id: string) => {
+        setSettings(prev => ({ ...prev, leaveQuotas: prev.leaveQuotas.filter(q => q.id !== id) }));
+        setHasChanges(true);
+    };
+
+    const updateLeaveQuota = (id: string, days: number) => {
+        setSettings(prev => ({
+            ...prev,
+            leaveQuotas: prev.leaveQuotas.map(q => q.id === id ? { ...q, days } : q)
+        }));
+        setHasChanges(true);
+    };
+
     if (!user || user.role !== 'principal') return null;
     if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading settings...</div>;
 
@@ -191,55 +239,54 @@ export function CollegeSettingsPage() {
             </PageHeader>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {/* Leave Quotas Configuration */}
-                <Card className="border-border">
+                <Card className="border-border lg:col-span-1">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <DoorOpen className="h-5 w-5" /> Base Leave Quotas
+                            <DoorOpen className="h-5 w-5" /> Leave Quotas
                         </CardTitle>
-                        <CardDescription>Configure standard leave days for faculty.</CardDescription>
+                        <CardDescription>Manage dynamic leave types and annual quotas.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="casualLeaves">Casual Leaves</Label>
+                            <div className="flex flex-col gap-2">
                                 <Input
-                                    id="casualLeaves"
-                                    type="number"
-                                    min="0"
-                                    value={settings.leaveQuotas.casual}
-                                    onChange={(e) => {
-                                        setSettings(prev => ({ ...prev, leaveQuotas: { ...prev.leaveQuotas, casual: parseInt(e.target.value) || 0 } }));
-                                        setHasChanges(true);
-                                    }}
+                                    placeholder="Leave Name (e.g. Research Leave)"
+                                    value={newLeaveLabel}
+                                    onChange={e => setNewLeaveLabel(e.target.value)}
                                 />
+                                <div className="flex gap-2">
+                                    <Input
+                                        type="number"
+                                        placeholder="Days"
+                                        className="w-24"
+                                        value={newLeaveDays}
+                                        onChange={e => setNewLeaveDays(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && addLeaveQuota()}
+                                    />
+                                    <Button variant="secondary" onClick={addLeaveQuota} className="flex-1"><Plus className="h-4 w-4 mr-2" /> Add</Button>
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="paidLeaves">Paid Leaves</Label>
-                                <Input
-                                    id="paidLeaves"
-                                    type="number"
-                                    min="0"
-                                    value={settings.leaveQuotas.paid}
-                                    onChange={(e) => {
-                                        setSettings(prev => ({ ...prev, leaveQuotas: { ...prev.leaveQuotas, paid: parseInt(e.target.value) || 0 } }));
-                                        setHasChanges(true);
-                                    }}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="sickLeaves">Sick Leaves</Label>
-                                <Input
-                                    id="sickLeaves"
-                                    type="number"
-                                    min="0"
-                                    value={settings.leaveQuotas.sick}
-                                    onChange={(e) => {
-                                        setSettings(prev => ({ ...prev, leaveQuotas: { ...prev.leaveQuotas, sick: parseInt(e.target.value) || 0 } }));
-                                        setHasChanges(true);
-                                    }}
-                                />
-                            </div>
+                            <ul className="space-y-3 max-h-[400px] overflow-y-auto pr-2 mt-4">
+                                {settings.leaveQuotas.map(quota => (
+                                    <li key={quota.id} className="space-y-2 p-3 bg-muted/50 rounded-md border border-border/50 transition-all">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-semibold text-sm">{quota.label}</span>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => removeLeaveQuota(quota.id)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Label className="text-[10px] uppercase opacity-60">Days:</Label>
+                                            <Input
+                                                type="number"
+                                                className="h-8 text-xs bg-background"
+                                                value={quota.days}
+                                                onChange={(e) => updateLeaveQuota(quota.id, parseInt(e.target.value) || 0)}
+                                            />
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
                     </CardContent>
                 </Card>

@@ -23,7 +23,7 @@ const NOTIFICATION_COLLECTION = 'notifications';
  * Create a new notification in Firestore
  */
 export async function createNotification(
-  toRole: 'hod' | 'faculty',
+  toRole: 'hod' | 'faculty' | 'principal',
   toDepartment: string,
   message: string,
   toEmail?: string
@@ -84,17 +84,30 @@ const notificationConverter = {
  * Get notifications for a faculty member by email
  */
 // Now your queries become type-safe and much cleaner:
-export async function getFacultyNotifications(email: string): Promise<Notification[]> {
+export async function getFacultyNotifications(email: string, department?: string): Promise<Notification[]> {
   try {
-    const q = query(
+    const qPersonal = query(
       collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter),
       where('toRole', '==', 'faculty'),
       where('toEmail', '==', email)
     );
-    const snap = await getDocs(q);
+    const snapPersonal = await getDocs(qPersonal);
+    let results = snapPersonal.docs.map(doc => doc.data());
 
-    // Sort client-side instead of orderBy to avoid composite index requirement
-    return snap.docs.map(doc => doc.data()).sort(
+    if (department) {
+      const qDept = query(
+        collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter),
+        where('toRole', '==', 'faculty'),
+        where('toEmail', '==', null),
+        where('toDepartment', '==', department)
+      );
+      const snapDept = await getDocs(qDept);
+      results = [...results, ...snapDept.docs.map(doc => doc.data())];
+    }
+
+    // Remove duplicates based on ID and sort
+    const uniqueResults = results.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+    return uniqueResults.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   } catch (error) {
@@ -134,19 +147,47 @@ export async function markNotificationAsRead(notificationId: string): Promise<vo
 }
 
 /**
- * Mark all notifications as read for a faculty email
+ * Mark all notifications as read based on role and filters
  */
-export async function markAllNotificationsAsRead(email: string): Promise<void> {
+export async function markAllNotificationsAsRead(
+  role: 'hod' | 'faculty' | 'principal',
+  filters: { email?: string; department?: string }
+): Promise<void> {
   try {
-    const q = query(
-      collection(db, NOTIFICATION_COLLECTION),
-      where('toRole', '==', 'faculty'),
-      where('toEmail', '==', email),
-      where('read', '==', false)
-    );
+    let q;
+    if (role === 'hod') {
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'hod'),
+        where('toDepartment', '==', filters.department),
+        where('read', '==', false)
+      );
+    } else if (role === 'principal') {
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'principal'),
+        where('read', '==', false)
+      );
+    } else {
+      // Faculty needs to mark both personal and department-wide ones if applicable
+      // But usually we just care about what they see on their screen.
+      // Let's stick to their personal ones for now or what they fetch.
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'faculty'),
+        where('toEmail', 'in', [filters.email, null]),
+        where('read', '==', false)
+      );
+    }
+
     const snap = await getDocs(q);
     const batch = writeBatch(db);
     snap.docs.forEach((d) => {
+      // Only mark department-wide faculty notifications if they are for the user's department
+      const data = d.data() as Notification;
+      if (role === 'faculty' && data.toEmail === null && data.toDepartment !== filters.department) {
+        return;
+      }
       batch.update(d.ref, { read: true });
     });
     await batch.commit();

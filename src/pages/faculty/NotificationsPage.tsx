@@ -16,7 +16,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/dashboard/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFacultyNotifications, markNotificationAsRead, createNotification } from '@/services/notificationService';
+import { getFacultyNotifications, markNotificationAsRead, createNotification, markAllNotificationsAsRead } from '@/services/notificationService';
 import { Notification } from '@/types/leave';
 import { Bell, Send, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -44,12 +44,20 @@ export function NotificationsPage() {
   const loadNotifications = async () => {
     if (!user || user.role !== 'faculty') return;
     try {
-      const notifs = await getFacultyNotifications(user.email);
+      const notifs = await getFacultyNotifications(user.email, user.department);
       setNotifications(
         notifs.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );
+
+      // Auto-mark as read
+      const unreadCount = notifs.filter(n => !n.read).length;
+      if (unreadCount > 0) {
+        await markAllNotificationsAsRead('faculty', { email: user.email, department: user.department });
+        // Update local state so "New" badges disappear immediately
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      }
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {

@@ -17,7 +17,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/dashboard/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
-import { getHODNotifications, createNotification } from '@/services/notificationService';
+import { getHODNotifications, createNotification, markAllNotificationsAsRead } from '@/services/notificationService';
 import { Notification } from '@/types/leave';
 import { Bell, Send, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -51,6 +51,14 @@ export function AdminNotificationsPage() {
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
       );
+
+      // Auto-mark as read
+      const unreadCount = notifs.filter(n => !n.read).length;
+      if (unreadCount > 0) {
+        await markAllNotificationsAsRead('hod', { department: user.department });
+        // Update local state so "New" badges disappear immediately
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      }
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
