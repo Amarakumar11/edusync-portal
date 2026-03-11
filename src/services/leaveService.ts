@@ -31,8 +31,14 @@ export async function createLeaveRequest(
   type: 'casual' | 'paid' | 'sick',
   reason: string,
   fromDate: string,
-  toDate: string
+  toDate: string,
+  durationInDays: number,
+  swaps: any[],
+  fromTime?: string,
+  toTime?: string
 ): Promise<LeaveRequest> {
+  const initialStatus = swaps.length > 0 ? 'swaps_pending' : 'pending_hod';
+
   const leaveData = {
     facultyEmail,
     facultyName,
@@ -42,7 +48,11 @@ export async function createLeaveRequest(
     reason,
     fromDate,
     toDate,
-    status: 'pending' as const,
+    fromTime,
+    toTime,
+    durationInDays,
+    swaps,
+    status: initialStatus as 'swaps_pending' | 'pending_hod',
     createdAt: new Date().toISOString(),
   };
 
@@ -114,15 +124,68 @@ export async function getLeaveRequestsByFaculty(email: string): Promise<LeaveReq
   }
 }
 
-/**
- * Update leave request status (approve/reject)
- */
 export async function updateLeaveRequestStatus(
   leaveId: string,
-  status: 'approved' | 'rejected'
+  status: 'swaps_pending' | 'pending_hod' | 'pending_principal' | 'approved' | 'rejected' | 'cancelled'
 ): Promise<void> {
   const docRef = doc(db, LEAVE_COLLECTION, leaveId);
   await updateDoc(docRef, { status });
+}
+
+/**
+ * Accept a swap request within a leave request
+ */
+export async function acceptLeaveSwap(
+  leaveId: string,
+  swapId: string,
+  acceptorEmail: string,
+  acceptorName: string,
+  currentSwaps: any[]
+): Promise<void> {
+  const updatedSwaps = currentSwaps.map(swap => {
+    if (swap.id === swapId) {
+      return {
+        ...swap,
+        status: 'accepted',
+        acceptedByEmail: acceptorEmail,
+        acceptedByName: acceptorName
+      };
+    }
+    return swap;
+  });
+
+  // Check if all swaps are now accepted
+  const allAccepted = updatedSwaps.every(s => s.status === 'accepted');
+  const updates: any = { swaps: updatedSwaps };
+
+  if (allAccepted) {
+    updates.status = 'pending_hod';
+  }
+
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  await updateDoc(docRef, updates);
+}
+
+/**
+ * Cancel a swap request (if the requested faculty rejects it)
+ */
+export async function rejectLeaveSwap(
+  leaveId: string,
+  swapId: string,
+  currentSwaps: any[]
+): Promise<void> {
+  const updatedSwaps = currentSwaps.map(swap => {
+    if (swap.id === swapId) {
+      return {
+        ...swap,
+        status: 'rejected',
+      };
+    }
+    return swap;
+  });
+
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  await updateDoc(docRef, { swaps: updatedSwaps });
 }
 
 /**

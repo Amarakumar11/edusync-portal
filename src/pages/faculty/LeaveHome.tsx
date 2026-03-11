@@ -7,9 +7,11 @@ import { PageHeader } from '@/components/dashboard/PageHeader';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { DataCard } from '@/components/dashboard/DataCard';
 import { Button } from '@/components/ui/button';
-import { Calendar, FileText, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Calendar, FileText, CheckCircle2, XCircle, Clock, Check, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { acceptLeaveSwap, rejectLeaveSwap } from '@/services/leaveService';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 // Removed static leaveBalance
 
@@ -40,6 +42,37 @@ export function LeaveHome() {
 
   const [leaveBalance, setLeaveBalance] = useState({ casual: 0, paid: 0, sick: 0, total: 0 });
   const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
+  const [pendingSwaps, setPendingSwaps] = useState<{ leave: any, swap: any }[]>([]);
+
+  const fetchPendingSwaps = async () => {
+    if (!user?.email || !user?.department) return;
+    try {
+      const q = query(
+        collection(db, 'leaveRequests'),
+        where('department', '==', user.department),
+        where('status', '==', 'swaps_pending')
+      );
+      const snap = await getDocs(q);
+      const swapsList: any[] = [];
+      snap.docs.forEach(d => {
+        const leave = { id: d.id, ...d.data() } as any;
+        if (leave.facultyEmail === user.email) return;
+
+        leave.swaps?.forEach((swap: any) => {
+          if (swap.status === 'pending' && (!swap.requestToEmail || swap.requestToEmail === user.email)) {
+            swapsList.push({ leave, swap });
+          }
+        });
+      });
+      setPendingSwaps(swapsList);
+    } catch (err) {
+      console.error("Error fetching pending swaps", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingSwaps();
+  }, [user]);
 
   useEffect(() => {
     if (user?.email) {
@@ -111,6 +144,25 @@ export function LeaveHome() {
     }
   };
 
+  const handleAcceptSwap = async (leaveId: string, swapId: string, currentSwaps: any[]) => {
+    if (!user) return;
+    try {
+      await acceptLeaveSwap(leaveId, swapId, user.email, user.name, currentSwaps);
+      fetchPendingSwaps(); // Refresh
+    } catch (err) {
+      console.error("Error accepting swap", err);
+    }
+  };
+
+  const handleRejectSwap = async (leaveId: string, swapId: string, currentSwaps: any[]) => {
+    try {
+      await rejectLeaveSwap(leaveId, swapId, currentSwaps);
+      fetchPendingSwaps(); // Refresh
+    } catch (err) {
+      console.error("Error rejecting swap", err);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -156,6 +208,40 @@ export function LeaveHome() {
           variant="info"
         />
       </div>
+
+      {/* Pending Swap Requests */}
+      {pendingSwaps.length > 0 && (
+        <DataCard title="Pending Swap Requests">
+          <div className="grid sm:grid-cols-2 gap-4">
+            {pendingSwaps.map(({ leave, swap }) => (
+              <div key={swap.id} className="p-4 border rounded-lg bg-card space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-semibold text-primary">{swap.subject} ({swap.section})</h4>
+                    <p className="text-sm text-foreground">{leave.facultyName} is requesting a substitute</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {swap.date} • {swap.day} • {swap.slot} • Room: {swap.room}
+                    </p>
+                    {!swap.requestToEmail && (
+                      <span className="inline-block mt-2 text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground">Open to Anyone</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="w-full bg-success hover:bg-success/90" onClick={() => handleAcceptSwap(leave.id, swap.id, leave.swaps)}>
+                    <Check className="mr-2 h-4 w-4" /> Accept
+                  </Button>
+                  {swap.requestToEmail && (
+                    <Button size="sm" variant="destructive" className="w-full" onClick={() => handleRejectSwap(leave.id, swap.id, leave.swaps)}>
+                      <X className="mr-2 h-4 w-4" /> Reject
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DataCard>
+      )}
 
       {/* Calendar View */}
       <DataCard

@@ -54,6 +54,17 @@ type TimetableData = {
   };
 };
 
+interface ClassTimetable {
+  id: string;
+  departmentId: string;
+  classId: string;
+  className: string;
+  pdfUrl: string;
+  storagePath: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
 // Initialize empty timetable
 const initTimetable = (): TimetableData => {
   const data: TimetableData = {};
@@ -75,6 +86,7 @@ export function TimetablePage() {
   const [selectedCell, setSelectedCell] = useState<{ day: string; slot: string } | null>(null);
   const [formData, setFormData] = useState({ subject: '', section: '', room: '' });
   const [hasChanges, setHasChanges] = useState(false);
+  const [acceptedSwaps, setAcceptedSwaps] = useState<any[]>([]);
 
   // Class Timetable PDF Upload States
   const [showUploadForm, setShowUploadForm] = useState(false);
@@ -131,9 +143,56 @@ export function TimetablePage() {
       }
     };
 
+    const fetchAcceptedSwaps = async () => {
+      if (!effectiveUid) return;
+      try {
+        let targetEmail = user?.email;
+        if (targetUid && targetUid !== user?.uid) {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const userDoc = await getDoc(doc(db, 'users', targetUid));
+          if (userDoc.exists()) {
+            targetEmail = userDoc.data().email;
+          }
+        }
+
+        if (!targetEmail) return;
+
+        const { collection, getDocs } = await import('firebase/firestore');
+        const snap = await getDocs(collection(db, 'leaveRequests'));
+
+        const mySwaps: any[] = [];
+        snap.docs.forEach(doc => {
+          const leave = doc.data();
+          if (leave.status === 'rejected' || leave.status === 'cancelled') return;
+
+          leave.swaps?.forEach((swap: any) => {
+            if (swap.status === 'accepted' && swap.acceptedByEmail === targetEmail) {
+              // Only show ongoing or upcoming
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const swapDate = new Date(swap.date);
+              if (swapDate >= today) {
+                mySwaps.push({
+                  leaveId: doc.id,
+                  applicantName: leave.facultyName,
+                  ...swap
+                });
+              }
+            }
+          });
+        });
+
+        mySwaps.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        setAcceptedSwaps(mySwaps);
+      } catch (err) {
+        console.error("Error fetching swaps:", err);
+      }
+    };
+
     fetchTimetable();
     fetchGlobalData();
-  }, [user, effectiveUid]);
+    fetchAcceptedSwaps();
+  }, [user, effectiveUid, targetUid]);
 
   const handleCellClick = (day: string, slot: string) => {
     if (!canEdit) return; // Prevent clicking if read-only
@@ -340,6 +399,28 @@ export function TimetablePage() {
                       </Button>
                     )}
                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DataCard>
+      )}
+
+      {acceptedSwaps.length > 0 && (
+        <DataCard title="Upcoming Substitution Classes" className="border-primary/20 bg-primary/5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {acceptedSwaps.map((swap, idx) => (
+              <div key={idx} className="p-4 rounded-lg bg-card border shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                    {swap.date}
+                  </Badge>
+                  <span className="text-xs font-medium text-muted-foreground">{swap.day} • {swap.slot}</span>
+                </div>
+                <h4 className="font-semibold">{swap.subject} ({swap.section})</h4>
+                <div className="text-sm text-foreground mt-1">Room: {swap.room}</div>
+                <div className="text-xs text-muted-foreground mt-2 border-t pt-2">
+                  Substitute for: <strong>{swap.applicantName}</strong>
                 </div>
               </div>
             ))}

@@ -21,9 +21,11 @@ import {
 import { Calendar, Filter } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
-import { getLeaveRequestsByFaculty, deleteLeaveRequest } from '@/services/leaveService';
+import { getLeaveRequestsByFaculty, deleteLeaveRequest, updateLeaveRequestStatus } from '@/services/leaveService';
 import { LeaveRequest } from '@/types/leave';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Trash2, AlertCircle } from 'lucide-react';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -31,6 +33,13 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-green-100 text-green-800 hover:bg-green-100/80 border-green-200">Approved</Badge>;
     case 'rejected':
       return <Badge className="bg-red-100 text-red-800 hover:bg-red-100/80 border-red-200">Rejected</Badge>;
+    case 'cancelled':
+      return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100/80 border-gray-200">Cancelled</Badge>;
+    case 'swaps_pending':
+      return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100/80 border-purple-200">Pending Swaps</Badge>;
+    case 'pending_hod':
+    case 'pending_principal':
+      return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100/80 border-yellow-200">Pending Approval</Badge>;
     default:
       return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100/80 border-yellow-200">Pending</Badge>;
   }
@@ -107,6 +116,18 @@ export function LeaveHistoryPage() {
     return true;
   });
 
+  const handleCancelLeave = async (leaveId: string) => {
+    if (!window.confirm("Are you sure you want to cancel this leave application? This will also cancel any requested swaps.")) return;
+    try {
+      await updateLeaveRequestStatus(leaveId, 'cancelled');
+      toast.success("Leave request cancelled successfully");
+      loadHistoryAndCleanup(user.email!);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to cancel leave request");
+    }
+  };
+
   if (!user || user.role !== 'faculty') return null;
 
   return (
@@ -163,6 +184,7 @@ export function LeaveHistoryPage() {
                   <TableHead className="hidden sm:table-cell">Reason</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden md:table-cell">Applied On</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -175,17 +197,46 @@ export function LeaveHistoryPage() {
                       <TableCell>
                         <div className="text-sm">
                           {format(startDate, 'MMM d, yyyy')}
-                          {startDate.getTime() !== endDate.getTime() && (
-                            <> - {format(endDate, 'MMM d, yyyy')}</>
+                          {leave.fromTime && <span className="text-muted-foreground ml-1">({leave.fromTime.split(' - ')[0]})</span>}
+
+                          {startDate.getTime() !== endDate.getTime() ? (
+                            <>
+                              <div className="my-0.5 text-muted-foreground/50 text-xs">to</div>
+                              {format(endDate, 'MMM d, yyyy')}
+                              {leave.toTime && <span className="text-muted-foreground ml-1">({leave.toTime.split(' - ')[1]})</span>}
+                            </>
+                          ) : (
+                            leave.fromTime && leave.toTime && (
+                              <>
+                                <span className="mx-1 text-muted-foreground text-xs">to</span>
+                                <span className="text-muted-foreground">({leave.toTime.split(' - ')[1]})</span>
+                              </>
+                            )
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell max-w-[200px] truncate" title={leave.reason}>
                         {leave.reason}
                       </TableCell>
-                      <TableCell>{getStatusBadge(leave.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1 items-start">
+                          {getStatusBadge(leave.status)}
+                          {leave.swaps?.some((s: any) => s.status === 'rejected') && (
+                            <span className="flex items-center text-xs text-destructive mt-1 font-medium">
+                              <AlertCircle className="w-3 h-3 mr-1" /> Swap Rejected
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="hidden md:table-cell text-muted-foreground">
                         {format(parseISO(leave.createdAt), 'PPP')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {['swaps_pending', 'pending_hod', 'pending_principal', 'pending'].includes(leave.status) && (
+                          <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleCancelLeave(leave.id)}>
+                            <Trash2 className="w-4 h-4 mr-2" /> Cancel
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

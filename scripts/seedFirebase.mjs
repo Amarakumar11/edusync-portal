@@ -2,6 +2,7 @@ import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // ── Load service account ─────────────────────────
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -13,7 +14,7 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-const db = admin.firestore();
+const db = getFirestore('default');
 const auth = admin.auth();
 
 // ── Seed data ────────────────────────────────────

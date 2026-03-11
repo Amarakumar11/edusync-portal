@@ -120,7 +120,7 @@ export function LandingPage() {
                 size="lg"
                 variant="outline"
                 onClick={() => navigate('/login/hod')}
-                className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 font-semibold px-8"
+                className="border-primary-foreground/30 text-primary-foreground bg-primary-foreground/20 hover:bg-primary-foreground/10 font-semibold px-8"
               >
                 HOD Login
               </Button>
@@ -128,7 +128,7 @@ export function LandingPage() {
                 size="lg"
                 variant="outline"
                 onClick={() => navigate('/login/faculty')}
-                className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 font-semibold px-8"
+                className="border-primary-foreground/30 text-primary-foreground bg-primary-foreground/20 hover:bg-primary-foreground/10 font-semibold px-8"
               >
                 Faculty Login
               </Button>
