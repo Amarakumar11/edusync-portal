@@ -51,13 +51,22 @@ export function AdminHome() {
       const evSnap = await getDocs(eventsQ);
       setUpcomingEvents(evSnap.docs.filter(d => new Date(d.data().date) >= new Date()).length);
 
-      // 4. Pending Leaves (Leave handling mainly for HODs)
-      if (user.role === 'hod') {
-        const leaves = await getLeaveRequestsByDepartment(user.department || '');
-        const pending = leaves.filter(l => l.status === 'pending').slice(0, 5); // top 5
-        setPendingLeavesList(pending);
+      // 4. Pending Leaves (Leave handling for HOD & Principal)
+      if (user.role === 'hod' || user.role === 'principal') {
+        let leaves = [];
+        if (user.role === 'hod') {
+          leaves = await getLeaveRequestsByDepartment(user.department || '');
+          const pending = leaves.filter(l => l.status === 'pending_hod').slice(0, 5);
+          setPendingLeavesList(pending);
+        } else {
+          // Principal sees all pending_principal
+          const q = query(collection(db, 'leaveRequests'), where('status', '==', 'pending_principal'));
+          const snap = await getDocs(q);
+          const pending = snap.docs.map(d => ({ id: d.id, ...d.data() })).slice(0, 5);
+          setPendingLeavesList(pending);
+        }
       } else {
-        setPendingLeavesList([]); // Principal doesn't approve leaves
+        setPendingLeavesList([]);
       }
 
     } catch (error) {
