@@ -1,121 +1,297 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+// Firebase Firestore-based leave service
 
+import { db } from '@/firebase';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  Unsubscribe,
+  serverTimestamp,
+  Timestamp,
+} from 'firebase/firestore';
 import { LeaveRequest } from '@/types/leave';
 
-const LEAVE_STORAGE_KEY = 'edusync_leave_requests';
+const LEAVE_COLLECTION = 'leaveRequests';
 
 /**
- * Generate unique ID
+ * Create a new leave request in Firestore
  */
-function generateId(): string {
-  return `leave_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+export async function createLeaveRequest(
+  facultyEmail: string,
+  facultyName: string,
+  facultyErpId: string,
+  department: string,
+  type: string,
+  reason: string,
+  fromDate: string,
+  toDate: string,
+  durationInDays: number,
+  swaps: any[],
+  fromTime?: string,
+  toTime?: string
+): Promise<LeaveRequest> {
+  const initialStatus = swaps.length > 0 ? 'swaps_pending' : 'pending_hod';
+
+  const leaveData = {
+    facultyEmail,
+    facultyName,
+    facultyErpId,
+    department,
+    type,
+    reason,
+    fromDate,
+    toDate,
+    fromTime,
+    toTime,
+    durationInDays,
+    swaps,
+    status: initialStatus as 'swaps_pending' | 'pending_hod',
+    createdAt: new Date().toISOString(),
+  };
+
+  const docRef = await addDoc(collection(db, LEAVE_COLLECTION), leaveData);
+
+  return {
+    id: docRef.id,
+    ...leaveData,
+  } as LeaveRequest;
 }
 
 /**
- * Get all leave requests from localStorage
+ * Get all leave requests from Firestore
  */
-export function getAllLeaveRequests(): LeaveRequest[] {
+export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
   try {
-    const data = localStorage.getItem(LEAVE_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const snap = await getDocs(
+      query(collection(db, LEAVE_COLLECTION), orderBy('createdAt', 'desc'))
+    );
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
   } catch (error) {
-    console.error('Error reading leave requests from localStorage:', error);
+    console.error('Error fetching leave requests:', error);
     return [];
   }
 }
 
 /**
- * Create a new leave request
- */
-export function createLeaveRequest(
-  facultyEmail: string,
-  facultyName: string,
-  facultyErpId: string,
-  department: string,
-  reason: string,
-  fromDate: string,
-  toDate: string
-): LeaveRequest {
-  const leaveRequest: LeaveRequest = {
-    id: generateId(),
-    facultyEmail,
-    facultyName,
-    facultyErpId,
-    department: department as any,
-    reason,
-    fromDate,
-    toDate,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-
-  const allRequests = getAllLeaveRequests();
-  allRequests.push(leaveRequest);
-
-  try {
-    localStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(allRequests));
-  } catch (error) {
-    console.error('Error saving leave request to localStorage:', error);
-  }
-
-  return leaveRequest;
-}
-
-/**
  * Get leave requests by department
  */
-export function getLeaveRequestsByDepartment(department: string): LeaveRequest[] {
-  return getAllLeaveRequests().filter((req) => req.department === department);
+export async function getLeaveRequestsByDepartment(department: string): Promise<LeaveRequest[]> {
+  try {
+    const q = query(
+      collection(db, LEAVE_COLLECTION),
+      where('department', '==', department)
+    );
+    const snap = await getDocs(q);
+    const results = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (error) {
+    console.error('Error fetching leave requests by department:', error);
+    return [];
+  }
 }
 
 /**
  * Get leave requests by faculty email
  */
-export function getLeaveRequestsByFaculty(email: string): LeaveRequest[] {
-  return getAllLeaveRequests().filter((req) => req.facultyEmail === email);
+export async function getLeaveRequestsByFaculty(email: string): Promise<LeaveRequest[]> {
+  try {
+    const q = query(
+      collection(db, LEAVE_COLLECTION),
+      where('facultyEmail', '==', email)
+    );
+    const snap = await getDocs(q);
+    const results = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (error) {
+    console.error('Error fetching leave requests by faculty:', error);
+    return [];
+  }
+}
+
+export async function updateLeaveRequestStatus(
+  leaveId: string,
+  status: 'swaps_pending' | 'pending_hod' | 'pending_principal' | 'approved' | 'rejected' | 'cancelled'
+): Promise<void> {
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  const snap = await getDocs(query(collection(db, LEAVE_COLLECTION), where('__name__', '==', leaveId)));
+  if (snap.empty) return;
+
+  const leaveData = snap.docs[0].data() as LeaveRequest;
+
+  // If cancelled or rejected, also cancel all swaps
+  if (status === 'cancelled' || status === 'rejected') {
+    const updatedSwaps = leaveData.swaps?.map((s: any) => ({ ...s, status: 'cancelled' })) || [];
+    await updateDoc(docRef, { status, swaps: updatedSwaps });
+  } else {
+    await updateDoc(docRef, { status });
+  }
 }
 
 /**
- * Update leave request status
+ * Get leave requests by status (for Principal/Admin)
  */
-export function updateLeaveRequestStatus(
-  leaveId: string,
-  status: 'approved' | 'rejected'
-): LeaveRequest | null {
-  const allRequests = getAllLeaveRequests();
-  const leaveIndex = allRequests.findIndex((req) => req.id === leaveId);
-
-  if (leaveIndex === -1) {
-    return null;
-  }
-
-  allRequests[leaveIndex].status = status;
-
+export async function getLeaveRequestsByStatus(status: string): Promise<LeaveRequest[]> {
   try {
-    localStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(allRequests));
+    const q = query(
+      collection(db, LEAVE_COLLECTION),
+      where('status', '==', status)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
   } catch (error) {
-    console.error('Error updating leave request:', error);
+    console.error('Error fetching leave requests by status:', error);
+    return [];
+  }
+}
+
+/**
+ * Accept a swap request within a leave request
+ */
+export async function acceptLeaveSwap(
+  leaveId: string,
+  swapId: string,
+  acceptorEmail: string,
+  acceptorName: string,
+  currentSwaps: any[],
+  leaveRequest: LeaveRequest
+): Promise<void> {
+  const updatedSwaps = currentSwaps.map(swap => {
+    if (swap.id === swapId) {
+      return {
+        ...swap,
+        status: 'accepted',
+        acceptedByEmail: acceptorEmail,
+        acceptedByName: acceptorName
+      };
+    }
+    return swap;
+  });
+
+  // Check if all swaps are now accepted
+  const allAccepted = updatedSwaps.every(s => s.status === 'accepted');
+  const updates: any = { swaps: updatedSwaps };
+
+  if (allAccepted) {
+    updates.status = 'pending_hod';
   }
 
-  return allRequests[leaveIndex];
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  await updateDoc(docRef, updates);
+
+  // Notifications
+  await import('./notificationService').then(async ({ createNotification }) => {
+    // Notify requester
+    await createNotification(
+      'faculty',
+      leaveRequest.department,
+      `${acceptorName} accepted your swap request for ${updatedSwaps.find(s => s.id === swapId)?.subject}`,
+      leaveRequest.facultyEmail
+    );
+
+    if (allAccepted) {
+      // Notify HOD
+      await createNotification(
+        'hod',
+        leaveRequest.department,
+        `All swaps accepted for ${leaveRequest.facultyName}'s leave. Waiting for your approval.`,
+        undefined
+      );
+    }
+  });
+}
+
+/**
+ * Cancel a swap request (if the requested faculty rejects it)
+ */
+export async function rejectLeaveSwap(
+  leaveId: string,
+  swapId: string,
+  currentSwaps: any[]
+): Promise<void> {
+  const updatedSwaps = currentSwaps.map(swap => {
+    if (swap.id === swapId) {
+      return {
+        ...swap,
+        status: 'rejected',
+      };
+    }
+    return swap;
+  });
+
+  const docRef = doc(db, LEAVE_COLLECTION, leaveId);
+  await updateDoc(docRef, { swaps: updatedSwaps });
 }
 
 /**
  * Delete a leave request
  */
-export function deleteLeaveRequest(leaveId: string): boolean {
-  const allRequests = getAllLeaveRequests();
-  const filteredRequests = allRequests.filter((req) => req.id !== leaveId);
-
-  if (filteredRequests.length === allRequests.length) {
-    return false; // Not found
-  }
-
+export async function deleteLeaveRequest(leaveId: string): Promise<boolean> {
   try {
-    localStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(filteredRequests));
+    await deleteDoc(doc(db, LEAVE_COLLECTION, leaveId));
     return true;
   } catch (error) {
     console.error('Error deleting leave request:', error);
     return false;
   }
+}
+
+/**
+ * Listen to leave requests by department in real-time
+ */
+export function onLeaveRequestsByDepartment(
+  department: string,
+  callback: (requests: LeaveRequest[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, LEAVE_COLLECTION),
+    where('department', '==', department)
+  );
+  return onSnapshot(q, (snap) => {
+    const requests = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+    requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    callback(requests);
+  });
+}
+
+/**
+ * Listen to leave requests by faculty email in real-time
+ */
+export function onLeaveRequestsByFaculty(
+  email: string,
+  callback: (requests: LeaveRequest[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, LEAVE_COLLECTION),
+    where('facultyEmail', '==', email)
+  );
+  return onSnapshot(q, (snap) => {
+    const requests = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as LeaveRequest[];
+    requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    callback(requests);
+  });
 }

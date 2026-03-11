@@ -1,4 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/firebase';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/dashboard/PageHeader';
 import { DataCard } from '@/components/dashboard/DataCard';
 import { Button } from '@/components/ui/button';
@@ -21,7 +27,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit2, Trash2, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, FileUp, FileText, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
@@ -48,6 +54,17 @@ type TimetableData = {
   };
 };
 
+interface ClassTimetable {
+  id: string;
+  departmentId: string;
+  classId: string;
+  className: string;
+  pdfUrl: string;
+  storagePath: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
 // Initialize empty timetable
 const initTimetable = (): TimetableData => {
   const data: TimetableData = {};
@@ -60,42 +77,126 @@ const initTimetable = (): TimetableData => {
   return data;
 };
 
-// Mock initial data
-const mockTimetable: TimetableData = {
-  ...initTimetable(),
-  'Monday': {
-    ...initTimetable()['Monday'],
-    '10:00 - 11:00': { id: '1', subject: 'Data Structures', section: 'CSE-A', room: '301' },
-    '2:00 - 3:00': { id: '2', subject: 'Operating Systems', section: 'CSE-B', room: '302' },
-  },
-  'Tuesday': {
-    ...initTimetable()['Tuesday'],
-    '9:00 - 10:00': { id: '3', subject: 'Database Systems', section: 'CSE-A', room: 'Lab 201' },
-    '11:00 - 12:00': { id: '4', subject: 'Data Structures', section: 'CSE-C', room: '305' },
-  },
-  'Wednesday': {
-    ...initTimetable()['Wednesday'],
-    '10:00 - 11:00': { id: '5', subject: 'Computer Networks', section: 'CSE-A', room: '301' },
-  },
-  'Thursday': {
-    ...initTimetable()['Thursday'],
-    '2:00 - 3:00': { id: '6', subject: 'Database Systems', section: 'CSE-B', room: 'Lab 202' },
-  },
-  'Friday': {
-    ...initTimetable()['Friday'],
-    '9:00 - 10:00': { id: '7', subject: 'Operating Systems', section: 'CSE-A', room: '302' },
-    '3:00 - 4:00': { id: '8', subject: 'Data Structures', section: 'CSE-B', room: '301' },
-  },
-};
-
 export function TimetablePage() {
-  const [timetable, setTimetable] = useState<TimetableData>(mockTimetable);
+  const { user } = useAuth();
+  const { uid: targetUid } = useParams();
+  const [timetable, setTimetable] = useState<TimetableData>(initTimetable());
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{ day: string; slot: string } | null>(null);
   const [formData, setFormData] = useState({ subject: '', section: '', room: '' });
   const [hasChanges, setHasChanges] = useState(false);
+  const [acceptedSwaps, setAcceptedSwaps] = useState<any[]>([]);
+
+  // Class Timetable PDF Upload States
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [departments, setDepartments] = useState<{ id: string, name: string }[]>([]);
+  const [classesList, setClassesList] = useState<{ id: string, name: string, departmentId: string }[]>([]);
+  const [classTimetables, setClassTimetables] = useState<ClassTimetable[]>([]);
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+
+  const effectiveUid = targetUid || user?.uid;
+  const isReadOnly = user?.role === 'principal' || (targetUid && user?.role === 'faculty'); // Faculty can only view others if we allow it, but let's restrict to Principal read-only, and HOD edit.
+  // Actually, Principal is always read-only for timetables, and 'faculty' cannot view others currently, so we'll just disable editing for Principal.
+  const canEdit = user?.role === 'hod' || (user?.role === 'faculty' && !targetUid);
+
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      if (!effectiveUid) return;
+      try {
+        const docRef = doc(db, 'timetables', effectiveUid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().schedule) {
+          setTimetable(docSnap.data().schedule);
+        } else {
+          setTimetable(initTimetable());
+        }
+      } catch (error) {
+        console.error('Error fetching timetable:', error);
+        toast.error('Failed to load timetable');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const fetchGlobalData = async () => {
+      try {
+        const settingsRef = doc(db, 'settings', 'college');
+        const settingsSnap = await getDoc(settingsRef);
+        if (settingsSnap.exists() && settingsSnap.data().departments) {
+          setDepartments(settingsSnap.data().departments);
+        }
+
+        const { collection, getDocs } = await import('firebase/firestore');
+        // Fetch classes
+        const classesSnap = await getDocs(collection(db, 'classes'));
+        setClassesList(classesSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+
+        // Fetch uploaded class timetables
+        const ctSnap = await getDocs(collection(db, 'class_timetables'));
+        setClassTimetables(ctSnap.docs.map(d => ({ id: d.id, ...d.data() } as ClassTimetable)));
+      } catch (err) {
+        console.error('Error fetching global data:', err);
+      }
+    };
+
+    const fetchAcceptedSwaps = async () => {
+      if (!effectiveUid) return;
+      try {
+        let targetEmail = user?.email;
+        if (targetUid && targetUid !== user?.uid) {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const userDoc = await getDoc(doc(db, 'users', targetUid));
+          if (userDoc.exists()) {
+            targetEmail = userDoc.data().email;
+          }
+        }
+
+        if (!targetEmail) return;
+
+        const { collection, getDocs } = await import('firebase/firestore');
+        const snap = await getDocs(collection(db, 'leaveRequests'));
+
+        const mySwaps: any[] = [];
+        snap.docs.forEach(doc => {
+          const leave = doc.data();
+          if (leave.status === 'rejected' || leave.status === 'cancelled') return;
+
+          leave.swaps?.forEach((swap: any) => {
+            if (swap.status === 'accepted' && swap.acceptedByEmail === targetEmail) {
+              // Only show ongoing or upcoming
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const swapDate = new Date(swap.date);
+              if (swapDate >= today) {
+                mySwaps.push({
+                  leaveId: doc.id,
+                  applicantName: leave.facultyName,
+                  ...swap
+                });
+              }
+            }
+          });
+        });
+
+        mySwaps.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        setAcceptedSwaps(mySwaps);
+      } catch (err) {
+        console.error("Error fetching swaps:", err);
+      }
+    };
+
+    fetchTimetable();
+    fetchGlobalData();
+    fetchAcceptedSwaps();
+  }, [user, effectiveUid, targetUid]);
 
   const handleCellClick = (day: string, slot: string) => {
+    if (!canEdit) return; // Prevent clicking if read-only
+
     setSelectedCell({ day, slot });
     const existing = timetable[day][slot];
     if (existing) {
@@ -129,25 +230,203 @@ export function TimetablePage() {
     setIsDialogOpen(false);
   };
 
-  const handleSaveAll = () => {
-    // In production, this would save to Firebase
-    console.log('Saving timetable:', timetable);
-    setHasChanges(false);
+  const handleSaveAll = async () => {
+    if (!effectiveUid || !canEdit) return;
+    try {
+      await setDoc(doc(db, 'timetables', effectiveUid), {
+        schedule: timetable,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      setHasChanges(false);
+      toast.success('Timetable saved successfully');
+    } catch (error) {
+      console.error('Error saving timetable:', error);
+      toast.error('Failed to save timetable');
+    }
+  };
+
+  const handleUploadTimetable = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pdfFile || !selectedDept || !selectedClass || !user) return;
+
+    setIsUploadingPdf(true);
+    try {
+      const cls = classesList.find(c => c.id === selectedClass);
+      if (!cls) throw new Error("Class not found");
+
+      const formData = new FormData();
+      formData.append('file', pdfFile);
+      const serverPort = 3001;
+      const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
+      const response = await fetch(`${baseUrl}/api/upload/timetables`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Failed to upload PDF');
+      const data = await response.json();
+      const url = data.url;
+
+      const { collection, addDoc } = await import('firebase/firestore');
+      await addDoc(collection(db, 'class_timetables'), {
+        departmentId: selectedDept,
+        classId: selectedClass,
+        className: cls.name,
+        pdfUrl: url,
+        storagePath: url,
+        uploadedBy: user.name,
+        uploadedAt: new Date().toISOString()
+      });
+
+      toast.success('Class timetable uploaded successfully');
+      setPdfFile(null);
+      setSelectedDept('');
+      setSelectedClass('');
+      setShowUploadForm(false);
+
+      const { getDocs } = await import('firebase/firestore');
+      const ctSnap = await getDocs(collection(db, 'class_timetables'));
+      setClassTimetables(ctSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload timetable');
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
+
+  const handleDeleteTimetable = async (id: string, path: string) => {
+    if (!window.confirm('Delete this class timetable?')) return;
+    try {
+      if (path && !path.startsWith('/uploads/')) {
+        const fileRef = ref(storage, path);
+        await deleteObject(fileRef);
+      }
+      const { deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, 'class_timetables', id));
+      toast.success('Timetable deleted');
+      setClassTimetables(prev => prev.filter(t => t.id !== id));
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete timetable');
+    }
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader 
-        title="My Timetable"
-        description="Manage your class schedule"
+      <PageHeader
+        title={targetUid ? "Faculty Timetable" : "My Timetable"}
+        description={targetUid ? "View and manage faculty schedule" : "Manage your class schedule"}
       >
-        {hasChanges && (
-          <Button onClick={handleSaveAll} className="bg-primary hover:bg-primary/90">
-            <Save className="mr-2 h-4 w-4" />
-            Save Changes
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {!targetUid && (user?.role === 'hod' || user?.role === 'principal') && (
+            <Button
+              onClick={() => setShowUploadForm(!showUploadForm)}
+              variant={showUploadForm ? "outline" : "secondary"}
+            >
+              {showUploadForm ? 'Cancel' : <><FileUp className="mr-2 h-4 w-4" /> Upload PDF</>}
+            </Button>
+          )}
+          {hasChanges && (
+            <Button onClick={handleSaveAll} className="bg-primary hover:bg-primary/90">
+              <Save className="mr-2 h-4 w-4" />
+              Save Changes
+            </Button>
+          )}
+        </div>
       </PageHeader>
+
+      {showUploadForm && !targetUid && (user?.role === 'hod' || user?.role === 'principal') && (
+        <DataCard title="Upload Class Timetable (PDF)" className="bg-muted/30 border-primary/20">
+          <form onSubmit={handleUploadTimetable} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dept">Department</Label>
+                <Select value={selectedDept} onValueChange={setSelectedDept} disabled={isUploadingPdf}>
+                  <SelectTrigger><SelectValue placeholder="Select Dept" /></SelectTrigger>
+                  <SelectContent>
+                    {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.id}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cls">Class</Label>
+                <Select value={selectedClass} onValueChange={setSelectedClass} disabled={isUploadingPdf || !selectedDept}>
+                  <SelectTrigger><SelectValue placeholder={selectedDept ? "Select Class" : "Select Dept First"} /></SelectTrigger>
+                  <SelectContent>
+                    {classesList.filter(c => c.departmentId === selectedDept).map(c =>
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pdf">Timetable PDF</Label>
+                <Input
+                  id="pdf" type="file" accept=".pdf"
+                  onChange={e => setPdfFile(e.target.files?.[0] || null)} disabled={isUploadingPdf} required
+                />
+              </div>
+            </div>
+            <Button type="submit" disabled={isUploadingPdf || !selectedDept || !selectedClass || !pdfFile} className="bg-primary">
+              <FileUp className="mr-2 h-4 w-4" />
+              {isUploadingPdf ? 'Uploading...' : 'Upload Timetable'}
+            </Button>
+          </form>
+        </DataCard>
+      )}
+
+      {!targetUid && classTimetables.length > 0 && (
+        <DataCard title="Class Timetables (PDF)">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {classTimetables.map(ct => (
+              <div key={ct.id} className="p-4 rounded-lg border flex items-start gap-3 bg-card">
+                <div className="p-2 rounded-md bg-primary/10 text-primary mt-0.5">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-sm truncate">{ct.className}</h4>
+                  <p className="text-xs text-muted-foreground">{ct.departmentId} • {new Date(ct.uploadedAt).toLocaleDateString()}</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Button variant="outline" size="sm" asChild className="h-7 text-xs flex-1">
+                      <a href={ct.pdfUrl} target="_blank" rel="noopener noreferrer">
+                        <Download className="mr-2 h-3 w-3" /> Download
+                      </a>
+                    </Button>
+                    {(user?.role === 'hod' || user?.role === 'principal') && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteTimetable(ct.id, ct.storagePath)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DataCard>
+      )}
+
+      {acceptedSwaps.length > 0 && (
+        <DataCard title="Upcoming Substitution Classes" className="border-primary/20 bg-primary/5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {acceptedSwaps.map((swap, idx) => (
+              <div key={idx} className="p-4 rounded-lg bg-card border shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                    {swap.date}
+                  </Badge>
+                  <span className="text-xs font-medium text-muted-foreground">{swap.day} • {swap.slot}</span>
+                </div>
+                <h4 className="font-semibold">{swap.subject} ({swap.section})</h4>
+                <div className="text-sm text-foreground mt-1">Room: {swap.room}</div>
+                <div className="text-xs text-muted-foreground mt-2 border-t pt-2">
+                  Substitute for: <strong>{swap.applicantName}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DataCard>
+      )}
 
       <DataCard title="Weekly Schedule" contentClassName="p-0 overflow-x-auto">
         <div className="min-w-[800px]">
@@ -164,8 +443,8 @@ export function TimetablePage() {
             </thead>
             <tbody>
               {timeSlots.map((slot, slotIndex) => (
-                <tr 
-                  key={slot} 
+                <tr
+                  key={slot}
                   className={cn(
                     'border-b border-border',
                     slot === '12:00 - 1:00' && 'bg-muted/30'
@@ -180,7 +459,7 @@ export function TimetablePage() {
                   {days.map(day => {
                     const entry = timetable[day][slot];
                     return (
-                      <td key={`${day}-${slot}`} className="p-2">
+                      <td key={`${day} -${slot} `} className="p-2">
                         {slot === '12:00 - 1:00' ? (
                           <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">
                             Break
@@ -196,14 +475,17 @@ export function TimetablePage() {
                             <div className="text-xs text-muted-foreground mt-1">
                               {entry.section} • {entry.room}
                             </div>
-                            <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1" />
+                            {canEdit && <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1" />}
                           </button>
                         ) : (
                           <button
                             onClick={() => handleCellClick(day, slot)}
-                            className="w-full h-20 rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 transition-colors flex items-center justify-center group"
+                            className={cn(
+                              "w-full h-20 rounded-lg border-2 border-dashed border-border transition-colors flex items-center justify-center group",
+                              canEdit ? "hover:border-primary/50 hover:bg-muted/30 cursor-pointer" : "cursor-default"
+                            )}
                           >
-                            <Plus className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            {canEdit && <Plus className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
                           </button>
                         )}
                       </td>
@@ -221,15 +503,15 @@ export function TimetablePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {timetable[selectedCell?.day || '']?.[selectedCell?.slot || ''] 
-                ? 'Edit Class' 
+              {timetable[selectedCell?.day || '']?.[selectedCell?.slot || '']
+                ? 'Edit Class'
                 : 'Add Class'}
             </DialogTitle>
             <DialogDescription>
               {selectedCell?.day} • {selectedCell?.slot}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="subject">Subject</Label>
@@ -240,11 +522,11 @@ export function TimetablePage() {
                 onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="section">Section</Label>
-              <Select 
-                value={formData.section} 
+              <Select
+                value={formData.section}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, section: value }))}
               >
                 <SelectTrigger>
@@ -259,7 +541,7 @@ export function TimetablePage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="room">Room</Label>
               <Input

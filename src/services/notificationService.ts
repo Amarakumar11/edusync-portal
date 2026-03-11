@@ -1,114 +1,196 @@
-// ⚠️ DEMO MODE: Data stored in localStorage, no backend, no Firebase
+// Firebase Firestore-based notification service
 
+import { db } from '@/firebase';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  Unsubscribe,
+  writeBatch,
+} from 'firebase/firestore';
 import { Notification } from '@/types/leave';
 
-const NOTIFICATION_STORAGE_KEY = 'edusync_notifications';
+const NOTIFICATION_COLLECTION = 'notifications';
 
 /**
- * Generate unique ID
+ * Create a new notification in Firestore
  */
-function generateId(): string {
-  return `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Get all notifications from localStorage
- */
-export function getAllNotifications(): Notification[] {
-  try {
-    const data = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error reading notifications from localStorage:', error);
-    return [];
-  }
-}
-
-/**
- * Create a new notification
- */
-export function createNotification(
-  toRole: 'admin' | 'faculty',
+export async function createNotification(
+  toRole: 'hod' | 'faculty' | 'principal',
   toDepartment: string,
   message: string,
   toEmail?: string
-): Notification {
-  const notification: Notification = {
-    id: generateId(),
+): Promise<Notification> {
+  const notifData = {
     toRole,
-    toDepartment: toDepartment as any,
-    toEmail,
+    toDepartment: toDepartment,
+    toEmail: toEmail || null,
     message,
     createdAt: new Date().toISOString(),
     read: false,
   };
 
-  const allNotifications = getAllNotifications();
-  allNotifications.push(notification);
+  const docRef = await addDoc(collection(db, NOTIFICATION_COLLECTION), notifData);
 
+  return {
+    id: docRef.id,
+    ...notifData,
+  } as unknown as Notification;
+}
+
+/**
+ * Get all notifications from Firestore
+ */
+export async function getAllNotifications(): Promise<Notification[]> {
   try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+    const snap = await getDocs(
+      query(collection(db, NOTIFICATION_COLLECTION), orderBy('createdAt', 'desc'))
+    );
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
   } catch (error) {
-    console.error('Error saving notification to localStorage:', error);
+    console.error('Error fetching notifications:', error);
+    return [];
   }
-
-  return notification;
 }
 
-/**
- * Get notifications for faculty
- */
-export function getFacultyNotifications(email: string): Notification[] {
-  return getAllNotifications().filter(
-    (notif) => notif.toRole === 'faculty' && notif.toEmail === email
-  );
-}
 
-/**
- * Get notifications for admin by department
- */
-export function getAdminNotifications(department: string): Notification[] {
-  return getAllNotifications().filter(
-    (notif) => notif.toRole === 'admin' && notif.toDepartment === department
-  );
-}
-
-/**
- * Mark notification as read
- */
-export function markNotificationAsRead(notificationId: string): Notification | null {
-  const allNotifications = getAllNotifications();
-  const notifIndex = allNotifications.findIndex((notif) => notif.id === notificationId);
-
-  if (notifIndex === -1) {
-    return null;
+// Define a converter for your Notification type
+const notificationConverter = {
+  toFirestore: (notification: Notification) => {
+    // Exclude the 'id' when writing to Firestore, as it's the document key
+    const { id, ...data } = notification;
+    return data;
+  },
+  fromFirestore: (snapshot: any, options: any) => {
+    const data = snapshot.data(options);
+    return {
+      id: snapshot.id,
+      ...data
+    } as Notification; // Safe casting because we know the shape
   }
+};
 
-  allNotifications[notifIndex].read = true;
-
+/**
+ * Get notifications for a faculty member by email
+ */
+// Now your queries become type-safe and much cleaner:
+export async function getFacultyNotifications(email: string, department?: string): Promise<Notification[]> {
   try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
-  } catch (error) {
-    console.error('Error marking notification as read:', error);
-  }
+    const qPersonal = query(
+      collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter),
+      where('toRole', '==', 'faculty'),
+      where('toEmail', '==', email)
+    );
+    const snapPersonal = await getDocs(qPersonal);
+    let results = snapPersonal.docs.map(doc => doc.data());
 
-  return allNotifications[notifIndex];
-}
-
-/**
- * Mark all notifications as read for a user
- */
-export function markAllNotificationsAsRead(email: string): void {
-  const allNotifications = getAllNotifications();
-  const updated = allNotifications.map((notif) => {
-    if (notif.toEmail === email && notif.toRole === 'faculty' && !notif.read) {
-      return { ...notif, read: true };
+    if (department) {
+      const qDept = query(
+        collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter),
+        where('toRole', '==', 'faculty'),
+        where('toEmail', '==', null),
+        where('toDepartment', '==', department)
+      );
+      const snapDept = await getDocs(qDept);
+      results = [...results, ...snapDept.docs.map(doc => doc.data())];
     }
-    return notif;
-  });
 
+    // Remove duplicates based on ID and sort
+    const uniqueResults = results.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+    return uniqueResults.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  } catch (error) {
+    console.error('Error fetching faculty notifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Get notifications for HOD by department
+ */
+export async function getHODNotifications(department: string): Promise<Notification[]> {
   try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(updated));
+    const q = query(
+      collection(db, NOTIFICATION_COLLECTION),
+      where('toRole', '==', 'hod'),
+      where('toDepartment', '==', department)
+    );
+    const snap = await getDocs(q);
+    const results = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
+    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (error) {
+    console.error('Error fetching admin notifications:', error);
+    return [];
+  }
+}
+
+/**
+ * Mark a notification as read
+ */
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  const docRef = doc(db, NOTIFICATION_COLLECTION, notificationId);
+  await updateDoc(docRef, { read: true });
+}
+
+/**
+ * Mark all notifications as read based on role and filters
+ */
+export async function markAllNotificationsAsRead(
+  role: 'hod' | 'faculty' | 'principal',
+  filters: { email?: string; department?: string }
+): Promise<void> {
+  try {
+    let q;
+    if (role === 'hod') {
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'hod'),
+        where('toDepartment', '==', filters.department),
+        where('read', '==', false)
+      );
+    } else if (role === 'principal') {
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'principal'),
+        where('read', '==', false)
+      );
+    } else {
+      // Faculty needs to mark both personal and department-wide ones if applicable
+      // But usually we just care about what they see on their screen.
+      // Let's stick to their personal ones for now or what they fetch.
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'faculty'),
+        where('toEmail', 'in', [filters.email, null]),
+        where('read', '==', false)
+      );
+    }
+
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => {
+      // Only mark department-wide faculty notifications if they are for the user's department
+      const data = d.data() as Notification;
+      if (role === 'faculty' && data.toEmail === null && data.toDepartment !== filters.department) {
+        return;
+      }
+      batch.update(d.ref, { read: true });
+    });
+    await batch.commit();
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
   }
@@ -117,21 +199,56 @@ export function markAllNotificationsAsRead(email: string): void {
 /**
  * Delete a notification
  */
-export function deleteNotification(notificationId: string): boolean {
-  const allNotifications = getAllNotifications();
-  const filteredNotifications = allNotifications.filter(
-    (notif) => notif.id !== notificationId
-  );
-
-  if (filteredNotifications.length === allNotifications.length) {
-    return false; // Not found
-  }
-
+export async function deleteNotification(notificationId: string): Promise<boolean> {
   try {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(filteredNotifications));
+    await deleteDoc(doc(db, NOTIFICATION_COLLECTION, notificationId));
     return true;
   } catch (error) {
     console.error('Error deleting notification:', error);
     return false;
   }
+}
+
+/**
+ * Listen for HOD notifications in real-time
+ */
+export function onHODNotifications(
+  department: string,
+  callback: (notifications: Notification[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, NOTIFICATION_COLLECTION),
+    where('toRole', '==', 'hod'),
+    where('toDepartment', '==', department)
+  );
+  return onSnapshot(q, (snap) => {
+    const notifs = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
+    notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    callback(notifs);
+  });
+}
+
+/**
+ * Listen for faculty notifications in real-time
+ */
+export function onFacultyNotifications(
+  email: string,
+  callback: (notifications: Notification[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, NOTIFICATION_COLLECTION),
+    where('toRole', '==', 'faculty'),
+    where('toEmail', '==', email)
+  );
+  return onSnapshot(q, (snap) => {
+    const notifs = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as unknown as Notification[];
+    notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    callback(notifs);
+  });
 }
