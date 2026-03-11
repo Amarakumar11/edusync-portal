@@ -147,19 +147,47 @@ export async function markNotificationAsRead(notificationId: string): Promise<vo
 }
 
 /**
- * Mark all notifications as read for a faculty email
+ * Mark all notifications as read based on role and filters
  */
-export async function markAllNotificationsAsRead(email: string): Promise<void> {
+export async function markAllNotificationsAsRead(
+  role: 'hod' | 'faculty' | 'principal',
+  filters: { email?: string; department?: string }
+): Promise<void> {
   try {
-    const q = query(
-      collection(db, NOTIFICATION_COLLECTION),
-      where('toRole', '==', 'faculty'),
-      where('toEmail', '==', email),
-      where('read', '==', false)
-    );
+    let q;
+    if (role === 'hod') {
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'hod'),
+        where('toDepartment', '==', filters.department),
+        where('read', '==', false)
+      );
+    } else if (role === 'principal') {
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'principal'),
+        where('read', '==', false)
+      );
+    } else {
+      // Faculty needs to mark both personal and department-wide ones if applicable
+      // But usually we just care about what they see on their screen.
+      // Let's stick to their personal ones for now or what they fetch.
+      q = query(
+        collection(db, NOTIFICATION_COLLECTION),
+        where('toRole', '==', 'faculty'),
+        where('toEmail', 'in', [filters.email, null]),
+        where('read', '==', false)
+      );
+    }
+
     const snap = await getDocs(q);
     const batch = writeBatch(db);
     snap.docs.forEach((d) => {
+      // Only mark department-wide faculty notifications if they are for the user's department
+      const data = d.data() as Notification;
+      if (role === 'faculty' && data.toEmail === null && data.toDepartment !== filters.department) {
+        return;
+      }
       batch.update(d.ref, { read: true });
     });
     await batch.commit();

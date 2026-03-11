@@ -33,6 +33,7 @@ import MyNotesPage from "./pages/admin/MyNotesPage";
 import { FacultyInfoPage } from "./pages/admin/FacultyInfoPage";
 import { LeaveRequestsPage } from "./pages/admin/LeaveRequestsPage";
 import { AdminNotificationsPage } from "./pages/admin/NotificationsPage";
+import { PrincipalNotificationsPage } from "./pages/admin/PrincipalNotificationsPage";
 import OTPVerificationPage from "./pages/auth/OTPVerificationPage";
 import CollegeSettingsPage from "./pages/admin/CollegeSettingsPage";
 import ClassesManagerPage from "./pages/admin/ClassesManagerPage";
@@ -101,6 +102,7 @@ const App = () => (
               <Route index element={<AdminHome />} />
               <Route path="all-timetables" element={<AllTimetablesPage />} />
               <Route path="leave-requests" element={<LeaveRequestsPage />} />
+              <Route path="notifications" element={<PrincipalNotificationsPage />} />
               <Route path="faculty" element={<FacultyInfoPage />} />
               <Route path="faculty/:uid/timetable" element={<TimetablePage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />

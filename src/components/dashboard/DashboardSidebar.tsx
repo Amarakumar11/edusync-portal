@@ -79,6 +79,7 @@ const principalNavItems: NavItemType[] = [
   { title: 'Events', href: '/principal/events', icon: CalendarDays },
   { title: 'Examination Info', href: '/principal/exams', icon: GraduationCap },
   { title: 'Leave Requests', href: '/principal/leave-requests', icon: ClipboardList },
+  { title: 'My Notifications', href: '/principal/notifications', icon: Bell },
   { title: 'Profile', href: '/principal/profile', icon: User },
   { title: 'Classes', href: '/principal/classes', icon: BookOpen },
   { title: 'Settings', href: '/principal/settings', icon: Menu },
