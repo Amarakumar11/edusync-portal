@@ -78,6 +78,7 @@ const principalNavItems: NavItemType[] = [
   { title: 'Announcements', href: '/principal/announcements', icon: Megaphone },
   { title: 'Events', href: '/principal/events', icon: CalendarDays },
   { title: 'Examination Info', href: '/principal/exams', icon: GraduationCap },
+  { title: 'Leave Requests', href: '/principal/leave-requests', icon: ClipboardList },
   { title: 'Profile', href: '/principal/profile', icon: User },
   { title: 'Classes', href: '/principal/classes', icon: BookOpen },
   { title: 'Settings', href: '/principal/settings', icon: Menu },
@@ -102,9 +103,14 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
     let unsubLeaves = () => { };
 
     // 1. Unread Notifications
-    const notifsQuery = user.role === 'hod'
-      ? query(collection(db, 'notifications'), where('toRole', '==', 'hod'), where('toDepartment', '==', user.department))
-      : query(collection(db, 'notifications'), where('toRole', '==', 'faculty'), where('toEmail', '==', user.email));
+    let notifsQuery;
+    if (user.role === 'hod') {
+      notifsQuery = query(collection(db, 'notifications'), where('toRole', '==', 'hod'), where('toDepartment', '==', user.department));
+    } else if (user.role === 'principal') {
+      notifsQuery = query(collection(db, 'notifications'), where('toRole', '==', 'principal'));
+    } else {
+      notifsQuery = query(collection(db, 'notifications'), where('toRole', '==', 'faculty'), where('toEmail', '==', user.email));
+    }
 
     unsubNotifs = onSnapshot(notifsQuery, (snap) => {
       let unread = 0;
@@ -114,15 +120,14 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
       setUnreadNotifications(unread);
     });
 
-    // 2. Pending Leave Requests (HOD only)
-    if (user.role === 'hod') {
-      const leavesQuery = query(collection(db, 'leaveRequests'), where('department', '==', user.department));
+    // 2. Pending Leave Requests (HOD or Principal)
+    if (user.role === 'hod' || user.role === 'principal') {
+      const leavesQuery = user.role === 'hod'
+        ? query(collection(db, 'leaveRequests'), where('department', '==', user.department), where('status', '==', 'pending_hod'))
+        : query(collection(db, 'leaveRequests'), where('status', '==', 'pending_principal'));
+
       unsubLeaves = onSnapshot(leavesQuery, (snap) => {
-        let pending = 0;
-        snap.forEach(doc => {
-          if (doc.data().status === 'pending') pending++;
-        });
-        setPendingLeaves(pending);
+        setPendingLeaves(snap.size);
       });
     }
 

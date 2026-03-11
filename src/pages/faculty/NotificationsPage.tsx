@@ -44,7 +44,7 @@ export function NotificationsPage() {
   const loadNotifications = async () => {
     if (!user || user.role !== 'faculty') return;
     try {
-      const notifs = await getFacultyNotifications(user.email);
+      const notifs = await getFacultyNotifications(user.email, user.department);
       setNotifications(
         notifs.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()

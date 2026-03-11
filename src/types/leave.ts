@@ -35,8 +35,8 @@ export interface LeaveRequest {
 
 export interface Notification {
   id: string;
-  toRole: 'hod' | 'faculty';
-  toDepartment: Department;
+  toRole: 'hod' | 'faculty' | 'principal';
+  toDepartment: Department | 'ALL' | string;
   toEmail?: string; // optional for faculty-specific
   message: string;
   createdAt: string;

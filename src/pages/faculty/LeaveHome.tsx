@@ -12,6 +12,16 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { acceptLeaveSwap, rejectLeaveSwap } from '@/services/leaveService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { StatusBadge } from '@/components/dashboard/StatusBadge';
+import { Badge } from '@/components/ui/badge';
 
 // Removed static leaveBalance
 
@@ -43,35 +53,40 @@ export function LeaveHome() {
   const [leaveBalance, setLeaveBalance] = useState({ casual: 0, paid: 0, sick: 0, total: 0 });
   const [leaveHistory, setLeaveHistory] = useState<any[]>([]);
   const [pendingSwaps, setPendingSwaps] = useState<{ leave: any, swap: any }[]>([]);
+  const [acceptedSwaps, setAcceptedSwaps] = useState<{ leave: any, swap: any }[]>([]);
 
-  const fetchPendingSwaps = async () => {
+  const fetchSwaps = async () => {
     if (!user?.email || !user?.department) return;
     try {
       const q = query(
         collection(db, 'leaveRequests'),
-        where('department', '==', user.department),
-        where('status', '==', 'swaps_pending')
+        where('status', 'in', ['swaps_pending', 'pending_hod', 'pending_principal', 'approved'])
       );
       const snap = await getDocs(q);
-      const swapsList: any[] = [];
+      const pendingList: any[] = [];
+      const acceptedList: any[] = [];
+
       snap.docs.forEach(d => {
         const leave = { id: d.id, ...d.data() } as any;
-        if (leave.facultyEmail === user.email) return;
 
         leave.swaps?.forEach((swap: any) => {
-          if (swap.status === 'pending' && (!swap.requestToEmail || swap.requestToEmail === user.email)) {
-            swapsList.push({ leave, swap });
+          if (swap.status === 'pending' && (!swap.requestToEmail || swap.requestToEmail === user.email) && leave.facultyEmail !== user.email) {
+            pendingList.push({ leave, swap });
+          }
+          if (swap.status === 'accepted' && swap.acceptedByEmail === user.email) {
+            acceptedList.push({ leave, swap });
           }
         });
       });
-      setPendingSwaps(swapsList);
+      setPendingSwaps(pendingList);
+      setAcceptedSwaps(acceptedList.sort((a, b) => new Date(a.swap.date).getTime() - new Date(b.swap.date).getTime()));
     } catch (err) {
-      console.error("Error fetching pending swaps", err);
+      console.error("Error fetching swaps", err);
     }
   };
 
   useEffect(() => {
-    fetchPendingSwaps();
+    fetchSwaps();
   }, [user]);
 
   useEffect(() => {
@@ -144,11 +159,11 @@ export function LeaveHome() {
     }
   };
 
-  const handleAcceptSwap = async (leaveId: string, swapId: string, currentSwaps: any[]) => {
+  const handleAcceptSwap = async (leaveId: string, swapId: string, currentSwaps: any[], leave: any) => {
     if (!user) return;
     try {
-      await acceptLeaveSwap(leaveId, swapId, user.email, user.name, currentSwaps);
-      fetchPendingSwaps(); // Refresh
+      await acceptLeaveSwap(leaveId, swapId, user.email, user.name, currentSwaps, leave);
+      fetchSwaps(); // Refresh
     } catch (err) {
       console.error("Error accepting swap", err);
     }
@@ -157,7 +172,7 @@ export function LeaveHome() {
   const handleRejectSwap = async (leaveId: string, swapId: string, currentSwaps: any[]) => {
     try {
       await rejectLeaveSwap(leaveId, swapId, currentSwaps);
-      fetchPendingSwaps(); // Refresh
+      fetchSwaps(); // Refresh
     } catch (err) {
       console.error("Error rejecting swap", err);
     }
@@ -209,39 +224,113 @@ export function LeaveHome() {
         />
       </div>
 
-      {/* Pending Swap Requests */}
-      {pendingSwaps.length > 0 && (
-        <DataCard title="Pending Swap Requests">
-          <div className="grid sm:grid-cols-2 gap-4">
-            {pendingSwaps.map(({ leave, swap }) => (
-              <div key={swap.id} className="p-4 border rounded-lg bg-card space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-semibold text-primary">{swap.subject} ({swap.section})</h4>
-                    <p className="text-sm text-foreground">{leave.facultyName} is requesting a substitute</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {swap.date} • {swap.day} • {swap.slot} • Room: {swap.room}
-                    </p>
-                    {!swap.requestToEmail && (
-                      <span className="inline-block mt-2 text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground">Open to Anyone</span>
-                    )}
+      {/* Swap Management Sections */}
+      {(pendingSwaps.length > 0 || acceptedSwaps.length > 0) && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {pendingSwaps.length > 0 && (
+            <DataCard title="Pending Swap Requests">
+              <div className="grid gap-4">
+                {pendingSwaps.map(({ leave, swap }) => (
+                  <div key={swap.id} className="p-4 border rounded-xl bg-card transition-all hover:border-primary/50">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <Badge variant="outline" className="mb-2 bg-primary/5 text-primary border-primary/20">
+                          {swap.date} • {swap.day}
+                        </Badge>
+                        <h4 className="font-bold text-lg">{swap.subject}</h4>
+                        <p className="text-sm text-muted-foreground">Requested by <span className="text-foreground font-medium">{leave.facultyName}</span></p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-4">
+                      <div className="flex items-center gap-1.5 bg-muted/50 p-2 rounded-lg">
+                        <Clock className="w-3.5 h-3.5 text-primary" /> {swap.slot}
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-muted/50 p-2 rounded-lg">
+                        <Calendar className="w-3.5 h-3.5 text-primary" /> Room {swap.room}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1 bg-success hover:bg-success/90" onClick={() => handleAcceptSwap(leave.id, swap.id, leave.swaps, leave)}>
+                        <Check className="mr-2 h-4 w-4" /> Accept
+                      </Button>
+                      {swap.requestToEmail && (
+                        <Button size="sm" variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive/10" onClick={() => handleRejectSwap(leave.id, swap.id, leave.swaps)}>
+                          <X className="mr-2 h-4 w-4" /> Reject
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" className="w-full bg-success hover:bg-success/90" onClick={() => handleAcceptSwap(leave.id, swap.id, leave.swaps)}>
-                    <Check className="mr-2 h-4 w-4" /> Accept
-                  </Button>
-                  {swap.requestToEmail && (
-                    <Button size="sm" variant="destructive" className="w-full" onClick={() => handleRejectSwap(leave.id, swap.id, leave.swaps)}>
-                      <X className="mr-2 h-4 w-4" /> Reject
-                    </Button>
-                  )}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </DataCard>
+            </DataCard>
+          )}
+
+          {acceptedSwaps.length > 0 && (
+            <DataCard title="Classes I'm Covering">
+              <div className="grid gap-4">
+                {acceptedSwaps.map(({ leave, swap }) => (
+                  <div key={swap.id} className="p-4 border rounded-xl bg-green-50/30 border-green-200/50">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                            {swap.date}
+                          </Badge>
+                        </div>
+                        <h4 className="font-bold text-lg">{swap.subject}</h4>
+                        <p className="text-sm text-muted-foreground italic">Covering for {leave.facultyName}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-medium text-green-800">
+                      <span>Time: {swap.slot}</span>
+                      <span>Room: {swap.room}</span>
+                      <span>Section: {swap.section}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DataCard>
+          )}
+        </div>
       )}
+
+      {/* My Leave Requests Section */}
+      <DataCard title="My Leave Applications">
+        {leaveHistory.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <p>No leave applications found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>From</TableHead>
+                  <TableHead>To</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leaveHistory.map((leave) => (
+                  <TableRow key={leave.id}>
+                    <TableCell className="capitalize font-medium">{leave.type}</TableCell>
+                    <TableCell>{leave.fromDate}</TableCell>
+                    <TableCell>{leave.toDate}</TableCell>
+                    <TableCell>{leave.durationInDays} days</TableCell>
+                    <TableCell>
+                      <StatusBadge status={leave.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </DataCard>
 
       {/* Calendar View */}
       <DataCard

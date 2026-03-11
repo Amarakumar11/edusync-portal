@@ -23,7 +23,7 @@ const NOTIFICATION_COLLECTION = 'notifications';
  * Create a new notification in Firestore
  */
 export async function createNotification(
-  toRole: 'hod' | 'faculty',
+  toRole: 'hod' | 'faculty' | 'principal',
   toDepartment: string,
   message: string,
   toEmail?: string
@@ -84,17 +84,30 @@ const notificationConverter = {
  * Get notifications for a faculty member by email
  */
 // Now your queries become type-safe and much cleaner:
-export async function getFacultyNotifications(email: string): Promise<Notification[]> {
+export async function getFacultyNotifications(email: string, department?: string): Promise<Notification[]> {
   try {
-    const q = query(
+    const qPersonal = query(
       collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter),
       where('toRole', '==', 'faculty'),
       where('toEmail', '==', email)
     );
-    const snap = await getDocs(q);
+    const snapPersonal = await getDocs(qPersonal);
+    let results = snapPersonal.docs.map(doc => doc.data());
 
-    // Sort client-side instead of orderBy to avoid composite index requirement
-    return snap.docs.map(doc => doc.data()).sort(
+    if (department) {
+      const qDept = query(
+        collection(db, NOTIFICATION_COLLECTION).withConverter(notificationConverter),
+        where('toRole', '==', 'faculty'),
+        where('toEmail', '==', null),
+        where('toDepartment', '==', department)
+      );
+      const snapDept = await getDocs(qDept);
+      results = [...results, ...snapDept.docs.map(doc => doc.data())];
+    }
+
+    // Remove duplicates based on ID and sort
+    const uniqueResults = results.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+    return uniqueResults.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   } catch (error) {

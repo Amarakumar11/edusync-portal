@@ -100,6 +100,7 @@ const App = () => (
             }>
               <Route index element={<AdminHome />} />
               <Route path="all-timetables" element={<AllTimetablesPage />} />
+              <Route path="leave-requests" element={<LeaveRequestsPage />} />
               <Route path="faculty" element={<FacultyInfoPage />} />
               <Route path="faculty/:uid/timetable" element={<TimetablePage />} />
               <Route path="announcements" element={<AnnouncementsPage />} />
