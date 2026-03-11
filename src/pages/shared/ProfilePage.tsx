@@ -39,9 +39,7 @@ export function ProfilePage() {
         formData.append('file', file);
 
         try {
-            const serverPort = 3001;
-            const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
-            const response = await fetch(`${baseUrl}/api/upload/profiles`, {
+            const response = await fetch(`/api/upload/profiles`, {
                 method: 'POST',
                 body: formData,
             });

@@ -256,9 +256,7 @@ export function TimetablePage() {
 
       const formData = new FormData();
       formData.append('file', pdfFile);
-      const serverPort = 3001;
-      const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
-      const response = await fetch(`${baseUrl}/api/upload/timetables`, {
+      const response = await fetch(`/api/upload/timetables`, {
         method: 'POST',
         body: formData,
       });

@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"node server.mjs\"",
+    "dev:frontend": "vite",
+    "dev:server": "node server.mjs",
     "build": "vite build",
-    "build:dev": "vite build --mode development",
-    "lint": "eslint .",
+    "vercel-build": "vite build",
     "preview": "vite preview",
+    "deploy": "vercel --prod",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
