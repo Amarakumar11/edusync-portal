@@ -1,5 +1,5 @@
 // User Types
-export type UserRole = 'hod' | 'faculty' | 'principal';
+export type UserRole = 'hod' | 'faculty' | 'principal' | 'exam_branch';
 
 export interface User {
   id: string;
@@ -161,4 +161,34 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   subItems?: NavItem[];
+}
+
+// Examination Feature Types
+export interface ExamQuestion {
+  qnNumber: number;
+  text: string;
+  co: string; // Course Outcome
+  btl: string; // Bloom's Taxonomy Level
+  marks: number;
+}
+
+export type ExamPaperStatus = 'pending_hod' | 'approved' | 'rejected';
+
+export interface ExamPaper {
+  id: string;
+  batch: string; // e.g. "2024-2028"
+  department: string;
+  yearSem: string; // e.g. "II-I"
+  section: string;
+  subject: string;
+  examType: string; // e.g. "Mid 1", "Mid 2", "PPT", "Assignment"
+  totalQuestions: number;
+  totalObjective: number;
+  totalDescriptive: number;
+  questions: ExamQuestion[];
+  status: ExamPaperStatus;
+  createdBy: string; // faculty UID
+  createdByName: string; // faculty Name
+  createdAt: string; // ISO string Date
+  updatedAt?: string;
 }

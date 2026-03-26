@@ -5,7 +5,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles?: ('hod' | 'faculty' | 'principal')[];
+  allowedRoles?: ('hod' | 'faculty' | 'principal' | 'exam_branch')[];
 }
 
 /**
@@ -32,6 +32,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     let redirectPath = '/faculty';
     if (user.role === 'hod') redirectPath = '/hod';
     else if (user.role === 'principal') redirectPath = '/principal';
+    else if (user.role === 'exam_branch') redirectPath = '/exam_branch';
     return <Navigate to={redirectPath} replace />;
   }
 
