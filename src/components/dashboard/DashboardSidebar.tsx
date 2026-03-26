@@ -24,6 +24,7 @@ import {
   StickyNote,
   Upload,
   BookOpen,
+  Printer,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -53,7 +54,15 @@ const facultyNavItems: NavItemType[] = [
   { title: 'Announcements', href: '/faculty/announcements', icon: Megaphone },
   { title: 'Events', href: '/faculty/events', icon: CalendarDays },
   { title: 'My Notifications', href: '/faculty/notifications', icon: Bell },
-  { title: 'Examination Info', href: '/faculty/exams', icon: GraduationCap },
+  {
+    title: 'Examination Info',
+    href: '/faculty/exams',
+    icon: GraduationCap,
+    subItems: [
+      { title: 'Schedules', href: '/faculty/exams' },
+      { title: 'Create Paper', href: '/faculty/create-exam-paper' },
+    ]
+  },
   { title: 'Profile', href: '/faculty/profile', icon: User },
 ];
 
@@ -67,7 +76,15 @@ const hodNavItems: NavItemType[] = [
   { title: 'Events', href: '/hod/events', icon: CalendarDays },
   { title: 'My Notifications', href: '/hod/notifications', icon: Bell },
   { title: 'Faculty Info', href: '/hod/faculty', icon: Users },
-  { title: 'Examination Info', href: '/hod/exams', icon: GraduationCap },
+  {
+    title: 'Examination Info',
+    href: '/hod/exams',
+    icon: GraduationCap,
+    subItems: [
+      { title: 'Schedules', href: '/hod/exams' },
+      { title: 'Review Papers', href: '/hod/review-exams' },
+    ]
+  },
   { title: 'Profile', href: '/hod/profile', icon: User },
 ];
 
@@ -83,6 +100,11 @@ const principalNavItems: NavItemType[] = [
   { title: 'Profile', href: '/principal/profile', icon: User },
   { title: 'Classes', href: '/principal/classes', icon: BookOpen },
   { title: 'Settings', href: '/principal/settings', icon: Menu },
+];
+
+const examBranchNavItems: NavItemType[] = [
+  { title: 'Home', href: '/exam_branch', icon: Home },
+  { title: 'Profile', href: '/exam_branch/profile', icon: User },
 ];
 
 interface DashboardSidebarProps {
@@ -138,7 +160,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
     };
   }, [user]);
 
-  const navItems = role === 'principal' ? principalNavItems : (role === 'hod' ? hodNavItems : facultyNavItems);
+  const navItems = role === 'principal' ? principalNavItems : (role === 'exam_branch' ? examBranchNavItems : (role === 'hod' ? hodNavItems : facultyNavItems));
 
   const toggleExpanded = (title: string) => {
     setExpandedItems(prev =>

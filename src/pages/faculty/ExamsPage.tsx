@@ -182,7 +182,7 @@ export function ExamsPage() {
                 <Label htmlFor="examType">Exam Type</Label>
                 <Select
                   value={examType}
-                  onValueChange={(val: any) => setExamType(val)}
+                  onValueChange={(val: string) => setExamType(val as ExamType)}
                   disabled={isUploading}
                 >
                   <SelectTrigger>

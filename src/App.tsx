@@ -24,6 +24,7 @@ import AnnouncementsPage from "./pages/faculty/AnnouncementsPage";
 import EventsPage from "./pages/faculty/EventsPage";
 import { NotificationsPage } from "./pages/faculty/NotificationsPage";
 import ExamsPage from "./pages/faculty/ExamsPage";
+import CreateExamPaperPage from "./pages/faculty/CreateExamPaperPage";
 import ProfilePage from "./pages/shared/ProfilePage";
 
 // HOD Pages
@@ -37,6 +38,11 @@ import { PrincipalNotificationsPage } from "./pages/admin/PrincipalNotifications
 import OTPVerificationPage from "./pages/auth/OTPVerificationPage";
 import CollegeSettingsPage from "./pages/admin/CollegeSettingsPage";
 import ClassesManagerPage from "./pages/admin/ClassesManagerPage";
+import HODExamPapersPage from "./pages/admin/HODExamPapersPage";
+
+// Exam Branch Pages
+import ExamBranchHome from "./pages/exam_branch/ExamBranchHome";
+import PrintExamPaperPage from "./pages/exam_branch/PrintExamPaperPage";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +76,7 @@ const App = () => (
               <Route path="events" element={<EventsPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="exams" element={<ExamsPage />} />
+              <Route path="create-exam-paper" element={<CreateExamPaperPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>
 
@@ -90,6 +97,7 @@ const App = () => (
               <Route path="faculty" element={<FacultyInfoPage />} />
               <Route path="faculty/:uid/timetable" element={<TimetablePage />} />
               <Route path="exams" element={<ExamsPage />} />
+              <Route path="review-exams" element={<HODExamPapersPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>
 
@@ -111,6 +119,17 @@ const App = () => (
               <Route path="profile" element={<ProfilePage />} />
               <Route path="settings" element={<CollegeSettingsPage />} />
               <Route path="classes" element={<ClassesManagerPage />} />
+            </Route>
+
+            {/* Exam Branch Routes */}
+            <Route path="/exam_branch" element={
+                <ProtectedRoute allowedRoles={['exam_branch', 'faculty', 'principal']}>  # Temp
+                <DashboardLayout role="exam_branch" />
+              </ProtectedRoute>
+            }>
+              <Route index element={<ExamBranchHome />} />
+              <Route path="print/:id" element={<PrintExamPaperPage />} />
+              <Route path="profile" element={<ProfilePage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
