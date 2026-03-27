@@ -145,9 +145,7 @@ export function EventsPage() {
       if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        const serverPort = 3001;
-        const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
-        const response = await fetch(`${baseUrl}/api/upload/events`, {
+        const response = await fetch(`/api/upload/events`, {
           method: 'POST',
           body: formData,
         });

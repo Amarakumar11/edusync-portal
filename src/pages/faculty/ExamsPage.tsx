@@ -98,9 +98,7 @@ export function ExamsPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const serverPort = 3001;
-      const baseUrl = window.location.hostname === 'localhost' ? `http://localhost:${serverPort}` : '';
-      const response = await fetch(`${baseUrl}/api/upload/exams`, {
+      const response = await fetch(`/api/upload/exams`, {
         method: 'POST',
         body: formData,
       });
@@ -184,7 +182,7 @@ export function ExamsPage() {
                 <Label htmlFor="examType">Exam Type</Label>
                 <Select
                   value={examType}
-                  onValueChange={(val: any) => setExamType(val)}
+                  onValueChange={(val: string) => setExamType(val as ExamType)}
                   disabled={isUploading}
                 >
                   <SelectTrigger>
