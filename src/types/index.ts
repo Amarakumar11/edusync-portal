@@ -20,6 +20,10 @@ export interface FacultyUser extends User {
   role: 'faculty';
   department?: string;
   designation?: string;
+  qualifications?: { degree: string; year: string; university: string }[];
+  subjects?: string[];
+  experience?: { role: string; organization: string; years: number }[];
+  certificates?: { title: string; url: string; date: string }[];
 }
 
 export interface PrincipalUser extends User {

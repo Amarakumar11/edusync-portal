@@ -24,6 +24,10 @@ export interface AppUser {
   department: Department;
   createdAt: string;
   profileImage?: string;
+  qualifications?: any[];
+  subjects?: string[];
+  experience?: any[];
+  certificates?: any[];
 }
 
 interface AuthState {
@@ -70,6 +74,10 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<AppUser | n
         department: data.department || 'CSE',
         createdAt: data.createdAt || new Date().toISOString(),
         profileImage: data.profileImage,
+        qualifications: data.qualifications || [],
+        subjects: data.subjects || [],
+        experience: data.experience || [],
+        certificates: data.certificates || [],
       };
     }
     return null;

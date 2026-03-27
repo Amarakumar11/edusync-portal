@@ -27,6 +27,7 @@ export function FacultyHome() {
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
   const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
   const [nextClass, setNextClass] = useState<any>(null);
+  const [weeklyWorkload, setWeeklyWorkload] = useState(0);
 
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good Morning' : currentHour < 17 ? 'Good Afternoon' : 'Good Evening';
@@ -96,7 +97,7 @@ export function FacultyHome() {
         const fetchedAnn = annSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter((a: any) => a.department === 'All' || a.department === user.department);
         setRecentAnnouncements(fetchedAnn.slice(0, 3));
 
-        // 4. Next Class from Timetable
+        // 4. Next Class & Workload from Timetable
         if (user.uid) {
           const ttRef = doc(db, 'timetable', user.uid);
           const ttSnap = await getDoc(ttRef);
@@ -109,6 +110,16 @@ export function FacultyHome() {
               const firstValid = todayClasses.find((c: any) => c.subject && c.subject.trim() !== '');
               setNextClass(firstValid || null);
             }
+
+            // Calculate total workload
+            let totalClasses = 0;
+            const workDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            for (const d of workDays) {
+              if (data[d]) {
+                totalClasses += data[d].filter((c: any) => c.subject && c.subject.trim() !== '').length;
+              }
+            }
+            setWeeklyWorkload(totalClasses);
           }
         }
 
@@ -128,12 +139,19 @@ export function FacultyHome() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
         <StatsCard
           title="Next Class"
           value={nextClass ? nextClass.subject : 'No Classes'}
           description={nextClass ? nextClass.time : 'Enjoy your day'}
           icon={Clock}
+          variant="primary"
+        />
+        <StatsCard
+          title="Total Workload"
+          value={`${weeklyWorkload} hrs`}
+          description="Classes per week"
+          icon={FileText}
           variant="primary"
         />
         <StatsCard

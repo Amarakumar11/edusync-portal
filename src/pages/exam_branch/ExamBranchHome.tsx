@@ -118,7 +118,7 @@ export function ExamBranchHome() {
                                 <div className="flex items-center w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 border-border">
                                     <Button
                                         className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                                        onClick={() => navigate(`/exam_branch/print/${paper.id}`)}
+                                        onClick={() => window.open(`/exam_branch/print/${paper.id}`, '_blank')}
                                     >
                                         <Printer className="mr-2 h-4 w-4" />
                                         Print & Format

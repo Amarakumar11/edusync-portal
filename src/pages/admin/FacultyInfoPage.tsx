@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/dashboard/EmptyState';
 import { collection, query, where, getDocs, orderBy, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users } from 'lucide-react';
+import { Users, Eye, GraduationCap, Briefcase, BookOpen, Award } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -41,6 +41,10 @@ export function FacultyInfoPage() {
     const [loading, setLoading] = useState(true);
     const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
     const [isAddingUser, setIsAddingUser] = useState(false);
+
+    // View Profile State
+    const [selectedFaculty, setSelectedFaculty] = useState<any>(null);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     const [newStaff, setNewStaff] = useState({
         name: '', email: '', phone: '', erpId: '', role: 'faculty', department: 'CSE'
@@ -261,11 +265,23 @@ export function FacultyInfoPage() {
                                                 : 'Unknown'}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="outline" size="sm" asChild>
-                                                <Link to={`/${user.role}/faculty/${faculty.uid}/timetable`}>
-                                                    View Timetable
-                                                </Link>
-                                            </Button>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedFaculty(faculty);
+                                                        setIsProfileOpen(true);
+                                                    }}
+                                                >
+                                                    <Eye className="w-4 h-4 mr-1" /> View Profile
+                                                </Button>
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link to={`/${user.role}/faculty/${faculty.uid}/timetable`}>
+                                                        Timetable
+                                                    </Link>
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -274,6 +290,81 @@ export function FacultyInfoPage() {
                     </div>
                 )}
             </DataCard>
+
+            {/* Profile Dialog */}
+            <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+                <DialogContent className="sm:max-w-[600px] h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{selectedFaculty?.name}'s Profile</DialogTitle>
+                        <DialogDescription>{selectedFaculty?.role.toUpperCase()} • {selectedFaculty?.department}</DialogDescription>
+                    </DialogHeader>
+                    {selectedFaculty && (
+                        <div className="space-y-6 mt-4">
+                            {/* Qualifications */}
+                            <div className="space-y-2">
+                                <h4 className="flex items-center gap-2 font-semibold border-b pb-2"><GraduationCap className="w-4 h-4" /> Qualifications</h4>
+                                {selectedFaculty.qualifications && selectedFaculty.qualifications.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {selectedFaculty.qualifications.map((q: any, i: number) => (
+                                            <li key={i} className="text-sm bg-muted/30 p-2 rounded">
+                                                <strong>{q.degree}</strong> from {q.university} ({q.year})
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : <p className="text-sm text-muted-foreground">No qualifications added.</p>}
+                            </div>
+
+                            {/* Subjects */}
+                            <div className="space-y-2">
+                                <h4 className="flex items-center gap-2 font-semibold border-b pb-2"><BookOpen className="w-4 h-4" /> Subjects Taught</h4>
+                                {selectedFaculty.subjects && selectedFaculty.subjects.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedFaculty.subjects.map((s: string, i: number) => (
+                                            <span key={i} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">{s}</span>
+                                        ))}
+                                    </div>
+                                ) : <p className="text-sm text-muted-foreground">No subjects added.</p>}
+                            </div>
+
+                            {/* Experience */}
+                            <div className="space-y-2">
+                                <h4 className="flex items-center gap-2 font-semibold border-b pb-2"><Briefcase className="w-4 h-4" /> Experience</h4>
+                                {selectedFaculty.experience && selectedFaculty.experience.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {selectedFaculty.experience.map((e: any, i: number) => (
+                                            <li key={i} className="text-sm bg-muted/30 p-2 rounded">
+                                                <strong>{e.role}</strong> at {e.organization} ({e.years} years)
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : <p className="text-sm text-muted-foreground">No experience added.</p>}
+                            </div>
+
+                            {/* Certificates */}
+                            <div className="space-y-2">
+                                <h4 className="flex items-center gap-2 font-semibold border-b pb-2"><Award className="w-4 h-4" /> Certificates & Events</h4>
+                                {selectedFaculty.certificates && selectedFaculty.certificates.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {selectedFaculty.certificates.map((c: any, i: number) => (
+                                            <div key={i} className="text-sm bg-muted/30 p-2 rounded flex justify-between items-center">
+                                                <div>
+                                                    <p className="font-medium">{c.title}</p>
+                                                    <p className="text-xs text-muted-foreground">{c.date}</p>
+                                                </div>
+                                                {c.url && (
+                                                    <Button size="sm" variant="outline" asChild>
+                                                        <a href={c.url} target="_blank" rel="noopener noreferrer">View</a>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <p className="text-sm text-muted-foreground">No certificates added.</p>}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
