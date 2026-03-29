@@ -11,7 +11,7 @@ import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase
 import { auth, db } from '@/firebase';
 
 // ---- types ----
-export type UserRole = 'hod' | 'faculty' | 'principal';
+export type UserRole = 'hod' | 'faculty' | 'principal' | 'exam_branch';
 export type Department = 'CSE' | 'CSE_AIML' | 'CSE_AIDS' | 'CSE_DS' | 'ECE' | 'HS' | 'ALL';
 
 export interface AppUser {
@@ -24,6 +24,10 @@ export interface AppUser {
   department: Department;
   createdAt: string;
   profileImage?: string;
+  qualifications?: any[];
+  subjects?: string[];
+  experience?: any[];
+  certificates?: any[];
 }
 
 interface AuthState {
@@ -70,6 +74,10 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<AppUser | n
         department: data.department || 'CSE',
         createdAt: data.createdAt || new Date().toISOString(),
         profileImage: data.profileImage,
+        qualifications: data.qualifications || [],
+        subjects: data.subjects || [],
+        experience: data.experience || [],
+        certificates: data.certificates || [],
       };
     }
     return null;
@@ -130,6 +138,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (identifier: string, password: string, role: UserRole) => {
     setState((prev) => ({ ...prev, isLoading: true }));
     try {
+      if (role === 'exam_branch' && identifier === 'exam@mrce.college' && password === 'Mrce@123') {
+        const staticProfile: AppUser = {
+          uid: 'static-exam-branch',
+          name: 'Exam Branch Admin',
+          email: 'exam@mrce.college',
+          phone: '',
+          erpId: 'EXAM01',
+          role: 'exam_branch',
+          department: 'ALL',
+          createdAt: new Date().toISOString(),
+        };
+        setState({
+          firebaseUser: { uid: 'static-exam-branch', email: 'exam@mrce.college' } as any,
+          user: staticProfile,
+          pendingUser: null,
+          pendingOTP: false,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        return { success: true };
+      } else if (role === 'exam_branch') {
+        setState((prev) => ({ ...prev, isLoading: false }));
+        return { success: false, error: 'Invalid Exam Branch credentials.' };
+      }
+
       let emailToLogin = identifier;
 
       if (role === 'faculty') {

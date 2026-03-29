@@ -8,6 +8,10 @@ export interface FacultyProfile {
   phone: string;
   erpId: string;
   role: UserRole;
+  qualifications?: { degree: string; year: string; university: string }[];
+  subjects?: string[];
+  experience?: { role: string; organization: string; years: number }[];
+  certificates?: { title: string; url: string; date: string }[];
 }
 
 export interface Admin {

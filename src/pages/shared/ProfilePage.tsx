@@ -11,6 +11,7 @@ import { db, auth } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { toast } from 'sonner';
+import { FacultyProfileDetails } from '@/components/profile/FacultyProfileDetails';
 
 export function ProfilePage() {
     const { user, firebaseUser } = useAuth();
@@ -225,6 +226,11 @@ export function ProfilePage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Faculty Details */}
+            {(user.role === 'faculty' || user.role === 'hod') && (
+                <FacultyProfileDetails />
+            )}
         </div>
     );
 }

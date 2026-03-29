@@ -12,8 +12,8 @@ import type { ExamPaper } from '@/types';
 
 // Mock drive for logos
 const LOGO_DRIVE = [
-    { id: 'header_1', name: 'Standard College Header (Landscape)', url: 'https://placehold.co/1200x250/png?text=College+Header+Image' },
-    { id: 'header_2', name: 'College Header (Black & White)', url: 'https://placehold.co/1200x250/000000/FFFFFF/png?text=College+Header+Image' },
+    { id: 'header_1', name: 'Standard College Header', url: '/mrce_header.png' },
+    { id: 'header_2', name: 'CSE (AI & ML) Header', url: '/mrce_aiml_header.png' },
 ];
 
 export function PrintExamPaperPage() {
@@ -108,9 +108,9 @@ export function PrintExamPaperPage() {
             <div className="max-w-[210mm] min-h-[297mm] mx-auto bg-white text-black p-[20mm] print:p-0 shadow-lg print:shadow-none border border-border print:border-none">
 
                 {/* Landscape Header Image */}
-                <div className="w-full h-32 sm:h-40 border-b-2 border-black flex items-center justify-center mb-6 overflow-hidden">
+                <div className="w-full sm:h-40 border-b-2 border-black flex items-center justify-center mb-6 overflow-hidden">
                     {headerImage ? (
-                        <img src={headerImage} alt="Header" className="w-full h-full object-cover" />
+                        <img src={headerImage} alt="Header" className="w-full object-cover" />
                     ) : (
                         <div className="text-gray-400">Header Image Area</div>
                     )}

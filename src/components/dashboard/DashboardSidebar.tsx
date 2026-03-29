@@ -25,6 +25,9 @@ import {
   Upload,
   BookOpen,
   Printer,
+  CheckSquare,
+  PenTool,
+  FolderOpen
 } from 'lucide-react';
 import type { UserRole } from '@/types';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -55,10 +58,21 @@ const facultyNavItems: NavItemType[] = [
   { title: 'Events', href: '/faculty/events', icon: CalendarDays },
   { title: 'My Notifications', href: '/faculty/notifications', icon: Bell },
   {
+    title: 'Academics',
+    href: '/faculty/attendance', // dummy parent link
+    icon: BookOpen,
+    subItems: [
+      { title: 'Attendance', href: '/faculty/attendance' },
+      { title: 'Marks Entry', href: '/faculty/marks' },
+      { title: 'Courses & Syllabus', href: '/faculty/courses' },
+    ]
+  },
+  {
     title: 'Examination Info',
-    href: '/faculty/exams',
+    href: '/faculty/exam-dashboard', // parent link
     icon: GraduationCap,
     subItems: [
+      { title: 'Dashboard', href: '/faculty/exam-dashboard' },
       { title: 'Schedules', href: '/faculty/exams' },
       { title: 'Create Paper', href: '/faculty/create-exam-paper' },
     ]
@@ -76,11 +90,14 @@ const hodNavItems: NavItemType[] = [
   { title: 'Events', href: '/hod/events', icon: CalendarDays },
   { title: 'My Notifications', href: '/hod/notifications', icon: Bell },
   { title: 'Faculty Info', href: '/hod/faculty', icon: Users },
+  { title: 'Workload Reports', href: '/hod/workload', icon: FileText },
+  { title: 'Dept. Documents', href: '/hod/documents', icon: FolderOpen },
   {
     title: 'Examination Info',
-    href: '/hod/exams',
+    href: '/hod/exam-dashboard', // parent link
     icon: GraduationCap,
     subItems: [
+      { title: 'Dashboard', href: '/hod/exam-dashboard' },
       { title: 'Schedules', href: '/hod/exams' },
       { title: 'Review Papers', href: '/hod/review-exams' },
     ]

@@ -539,6 +539,10 @@ Your leave request has been approved by HOD (CSE)
 - HOD: hod.hs@edusync.com / Admin@
 - Faculty 6: faculty6@edusync.com / Faculty@123
 
+### Exam Branch (Static Login)
+- Email: exam@mrce.college
+- Password: Mrce@123
+
 ---
 
 ## ✅ Final Checklist
