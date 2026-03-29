@@ -10,6 +10,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 // Pages
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/auth/LoginPage";
+import ExamBranchLogin from "./pages/auth/ExamBranchLogin";
 import SignupPage from "./pages/auth/SignupPage";
 
 import NotFound from "./pages/NotFound";
@@ -62,6 +63,7 @@ const App = () => (
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/login/exam_branch" element={<ExamBranchLogin />} />
             <Route path="/login/:role" element={<LoginPage />} />
             <Route path="/signup/faculty" element={<SignupPage />} />
             <Route path="/verify-otp" element={<OTPVerificationPage />} />

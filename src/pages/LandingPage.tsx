@@ -79,6 +79,13 @@ export function LandingPage() {
               HOD Login
             </Button>
             <Button
+              variant="outline"
+              onClick={() => navigate('/login/exam_branch')}
+              className="hidden md:inline-flex border-primary/20 hover:bg-primary/5"
+            >
+              Exam Branch
+            </Button>
+            <Button
               onClick={() => navigate('/login/principal')}
               className="bg-primary hover:bg-primary/90"
             >
@@ -123,6 +130,14 @@ export function LandingPage() {
                 className="border-primary-foreground/30 text-primary-foreground bg-primary-foreground/20 hover:bg-primary-foreground/10 font-semibold px-8"
               >
                 HOD Login
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate('/login/exam_branch')}
+                className="border-primary-foreground/30 text-primary-foreground bg-primary-foreground/20 hover:bg-primary-foreground/10 font-semibold px-8"
+              >
+                Exam Branch
               </Button>
               <Button
                 size="lg"
@@ -210,7 +225,7 @@ export function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <Logo variant="light" size="sm" />
             <p className="text-sm text-sidebar-muted">
-              © 2024 EduSync. All rights reserved.
+              © 2026 EduSync. All rights reserved.
             </p>
           </div>
         </div>
